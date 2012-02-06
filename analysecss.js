@@ -1,10 +1,26 @@
-var  urls = ['http://www.scala-lang.org', 'http://www.scala-lang.org/node/219'],
- // ['http://127.0.0.1:8888/thing1s', 'http://127.0.0.1:8888/thing2s'],
-  responsesPerPage = [],
-  results = {}; // { fileName: { selector: true/false} }
-  
-// process urls from somewhere
-// command line list?
+// read command lin
+var fs = require('fs');
+
+var urls, urlsFile;
+
+
+if (phantom.args.length < 1) {
+	console.log("usage: phantomjs filename.txt (file with urls) or phantomjs http://x http://y ... etc");
+}
+else if ( phantom.args[0].indexOf("http") < 0) {
+	// read the file
+	console.log("open file " + phantom.args[0]);
+	urlsFile = fs.read(phantom.args[0]);
+	urls = urlsFile.split("\n");
+	
+	urls.forEach(function(url){console.log("URL: " + url)});
+}
+else {
+	// process a presumed list or urls
+}
+
+
+var  responsesPerPage = [], results = {}; // { fileName: { selector: true/false} }
 
 
 // I think everything needs to be self contained
@@ -72,7 +88,21 @@ var doStuff = function() {
 	var results = {};
 
 	selectors.forEach(function(selector) {
-		results[selector] = document.querySelectorAll(selector).length;
+		//console.log(selector);
+		if (selector.match(/@font-face/) || selector.match(/@charset/)) {
+			return; // ignore font-face, its not relevant
+		}
+		
+		var num = null;
+		try {
+			num = document.querySelectorAll(selector).length;
+		}
+		catch(e) {
+			console.log("bad selector: " + selector + "\n" + e);
+		}
+		if (num != null) {
+			results[selector] = num;
+		}
 	});
 	return results;
   };
@@ -101,6 +131,54 @@ var doStuff = function() {
   return resultsForPage;
 };
 
+
+
+var reduce = function(arr) {
+	
+	var summary = {}, sheet, result, selector;
+	
+	arr.forEach(function(results) {
+	    //var sheet, result, selector;
+		for (sheet in results) {
+		  	result = results[sheet];
+		
+		    if (! summary[sheet]) {
+				summary[sheet] = {};
+		    }
+			//console.log("stylesheet: " + sheet);
+			for (selector in result) {
+			//	console.log(selector + " : " + result[selector]);
+				if (typeof (summary[sheet][selector]) == 'undefined') {
+					summary[sheet][selector] = 0;
+				}
+				summary[sheet][selector] += result[selector];
+			}
+		}
+    });
+
+    //console.log('\n\n*** DONE ***\n');
+	return summary;
+};
+
+var printResults = function(summary) {
+	
+	var outFile = fs.open("results.txt", 'w');
+
+	for (sheet in summary) {
+		result = summary[sheet];
+	    outFile.writeLine("STYLESHEET: " + sheet);	
+		for (selector in result) {
+			outFile.writeLine(selector + " : " + result[selector]);
+		}
+	}
+	outFile.flush();
+	outFile.close();
+};
+
+
+
+// *** now something actually happens
+
 var page = require('webpage').create();
 page.onConsoleMessage = function(msg) {
     console.log(msg);
@@ -109,30 +187,16 @@ page.onConsoleMessage = function(msg) {
 // do them sequentially, otherwise we could kick off a load of them and crush my laptop
 var process = function process() {
   
-  var url;
+  var url, summary;
 
   // done, analyse results and shut down phantom
   if (urls.length === 0) {
-		console.log("results!!");
-	    responsesPerPage.forEach(function(results) {
-		    var sheet, result, selector;
-			for (sheet in results) {
-			  	result = results[sheet];
-				console.log("stylesheet: " + sheet);
-				for (selector in result) {
-					console.log(selector + " : " + result[selector]);
-				}
-			}
-	    });
-	
+		console.log("done, summarizing and printing results to file");
+	    summary = reduce(responsesPerPage);
+		printResults(summary);
     	phantom.exit();
   }
   else { 
-  
-	if (page) {
-		//page.release(); // memory
-	}
-    //page = WebPage.create();
 	
     url = urls.shift();
     console.log("lets do " + url)
@@ -154,4 +218,6 @@ var process = function process() {
     });
    
   }
-}();
+};
+
+process();

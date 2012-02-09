@@ -1,13 +1,9 @@
-// I'm going to make this a crawler!  Crawl your website and see how much css gets used.
+// Crawl your website and see how much css gets used.
 
 // read command line
 var fs = require('fs');
 
-var urls, urlsFile;
-
-var  responsesPerPage = []
-	, alreadyInQueue = {}
-	, results = {}; // { fileName: { selector: true/false} }
+var urls, urlsFile, startUrl, alreadyInQueue= {};
 
 
 if (phantom.args.length < 1) {
@@ -23,12 +19,11 @@ else if ( phantom.args[0].indexOf("http") < 0) {
 }
 else {
 	// url to start from
+	startUrl = phantom.args[0];
 	console.log(phantom.args[0]);
-	urls = [phantom.args[0]];
-	alreadyInQueue[phantom.args[0]] = true;
+	urls = [startUrl];
+	alreadyInQueue[startUrl] = true;
 }
-
-
 
 
 
@@ -39,8 +34,7 @@ else {
 // ourselves, and find the selectors
 // then we see how they are used. booyah.
 var doStuff = function() { 
-  // w3c are too conservative!
-  // so we can use forEach and on nodeLists
+  // w3c are rather conservative! lets embellish NodeList a little
   NodeList.prototype.forEach = Array.prototype.forEach;
 
   console.log("processing " + window.location.href);
@@ -55,11 +49,11 @@ var doStuff = function() {
 	
 	els.forEach( function(link) {
 
-	    var directory, lastDir;
-		var tmplink = link.getAttribute('href');
+	    var directory, lastDir, tmplink = link.getAttribute('href');
 		
+		// occassionally an a has nothing under its href !?
 		if ( !tmplink || tmplink.match(/^#/) || tmplink.match(/javascript/)) {
-			console.log("IGNORE " + tmplink);
+			//console.log("IGNORE " + tmplink);
 			return; // ignore this stuff
 		}
 
@@ -80,7 +74,6 @@ var doStuff = function() {
 
 		//filter out urls not on this domain
 		if( tmplink.indexOf( window.location.hostname ) !== -1 ){
-			//console.log("push link : " + tmplink);
 			urls.push( tmplink );
 		}
 
@@ -129,36 +122,39 @@ var doStuff = function() {
 		catch(e) {
 			console.log("bad selector: " + selector + "\n" + e);
 		}
-		if (num != null) {
+		if (num !== null) {
 			results[selector] = num;
 		}
 	});
 	return results;
   };
 
-  var pages = findPages();
+ 
 
   // actual logic
+  var pages = findPages();
   var links = findCssLinks();
+
   console.log("found " + links.length + " stylesheet links");
  
   var resultsForPage = {};
-  // for each css file, analyze its usage
+  // for each css file, load it, count use of each selector
   links.forEach(function(link) {
-	console.log("getting sheet " + link);
+	//console.log("getting sheet " + link);
 	var request = new XMLHttpRequest();  
 	request.open('GET', link, false);  // synchronous
 	request.send(null);  
  
 	if (request.status === 200) {  
 		resultsForPage[link] = analyzeStylesheet(request.responseText);
-		console.log("processed css files");
+	//	console.log("processed css files");
 	}
 	else {
 		console.log("xhr request fucked up");
 	}
   });
 
+  // send it back to parent process
   return {pages: pages, results: resultsForPage};
 };
 
@@ -168,7 +164,6 @@ var reduce = function(results) {
 	
 	var sheet, result, selector;
 	
-	//var sheet, result, selector;
 	for (sheet in results) {
 		result = results[sheet];
 		
@@ -188,7 +183,7 @@ var reduce = function(results) {
 
 var printResults = function() {
 	
-	var num, used = 0, unused = 0, outFile = fs.open("results.txt", 'w'), histogram = {};
+	var num, used = 0, unused = 0, fname = (startUrl + "_results.txt"), outFile = fs.open(fname , 'w'), histogram = {}, longestSelector = "";
 
 	for (sheet in summary) {
 		result = summary[sheet];
@@ -198,6 +193,9 @@ var printResults = function() {
 			if (num === 0) {
 				outFile.writeLine(selector + " : " + result[selector]);
 				unused += 1;
+				if ( selector.length > longestSelector.length) {
+					longestSelector = selector;
+				}
 			}
 			else {
 				used += 1;
@@ -219,6 +217,8 @@ var printResults = function() {
 	console.log("Unused: " + unused);
 	console.log("Used  : " + used);
 	
+	console.log("\nLongest Selector:\n" + longestSelector);
+	
 	outFile.flush();
 	outFile.close();
 };
@@ -226,13 +226,14 @@ var printResults = function() {
 
 
 // *** now something actually happens
-
 var page = require('webpage').create();
+
 page.onConsoleMessage = function(msg) {
     console.log(msg);
 };
 
-var visitedLinksFile = fs.open("visitedLinks.txt", 'w');
+var fname = (startUrl + "_visitedLinks.txt");
+var visitedLinksFile = fs.open(fname , 'w');
 var visited = 0;
 var addMore = true
 
@@ -273,12 +274,12 @@ var process = function process() {
 	    		pages = resp.pages;
 
 				pages.forEach(function(page) {
-					if (urls.length > 20) {
+					if (urls.length > 1000) {
 						addMore = false;
 					}
 			
 					if (addMore && !alreadyInQueue[page] ) {
-						console.log("ENQUEUE: " + page);
+						//console.log("ENQUEUE: " + page);
 				
 						urls.push(page);
 						alreadyInQueue[page] = true;

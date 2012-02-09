@@ -1,11 +1,15 @@
+"use strict"; 
+
 // Crawl your website and see how much css gets used.
+
+// problems: it occassionally dies on fxbml tags not rendering, can I catch an exception somewhere?
 
 // read command line
 var fs = require('fs');
 
 var urls, urlsFile, startUrl, alreadyInQueue= {};
 
-
+// plan is to take any number command line args of either urls starting with http, or filenames...tbc
 if (phantom.args.length < 1) {
 	console.log("usage: phantomjs filename.txt (file with urls) or phantomjs http://x http://y ... etc");
 }
@@ -26,22 +30,21 @@ else {
 }
 
 
-
-// I think everything needs to be self contained
-// for passing in to the page object.
-// On each page we first find the stylesheet links,
-// then for each one, we load the sheet for 
-// ourselves, and find the selectors
-// then we see how they are used. booyah.
+// This is the big fat routine we pass into the loaded page.
+// Everything needs to be self contained, no closure over variables in outer phantom process, it  can just return data.
+// What happens: On each page we first find the stylesheet links, and links to other pages.
+// For each stylesheet, we load it via xhr, then find the selectors
+// then count their usage on the page. Return this object: {stylesheet: { selector: count} }
+// and the list of ursl to other pages we found.
 var doStuff = function() { 
-  // w3c are rather conservative! lets embellish NodeList a little
+  //embellish NodeList a little
   NodeList.prototype.forEach = Array.prototype.forEach;
 
   console.log("processing " + window.location.href);
 
   // this takes the elements, either a ,or link 
   // makes absolute urls out of relative ones,
-  // and does some ignoring of links to other sites
+  // ignores links to other sites
   // and # or javascript void ones 
   var constructOwnUrls = function(els) {
 	
@@ -83,13 +86,12 @@ var doStuff = function() {
 
 
   var findPages = function() {
-	console.log("find pages");
 	var pageLinks = document.querySelectorAll('a');
 	return constructOwnUrls(pageLinks);
   };
 
   var findCssLinks = function() {
-	console.log("find css links")
+	
     var linkEls = document.querySelectorAll('link[rel=stylesheet]');
 	return constructOwnUrls(linkEls);
   };
@@ -181,9 +183,12 @@ var reduce = function(results) {
 	}
 };
 
+var filePrefix =  startUrl.replace("http://", '').replace(/\//g, '').replace(":", "_").replace(/\./g, "_");
+
 var printResults = function() {
 	
-	var num, used = 0, unused = 0, fname = (startUrl + "_results.txt"), outFile = fs.open(fname , 'w'), histogram = {}, longestSelector = "";
+	var i, sheet, selector, result, num, used = 0, unused = 0, histogram = [], longestUnusedSelector = "", mostUsedSelector;
+	var fname = (filePrefix + "_unused_css.txt"), outFile = fs.open(fname , 'w');
 
 	for (sheet in summary) {
 		result = summary[sheet];
@@ -193,12 +198,16 @@ var printResults = function() {
 			if (num === 0) {
 				outFile.writeLine(selector + " : " + result[selector]);
 				unused += 1;
-				if ( selector.length > longestSelector.length) {
-					longestSelector = selector;
+				if ( selector.length > longestUnusedSelector.length) {
+					longestUnusedSelector = selector;
 				}
 			}
 			else {
 				used += 1;
+			}
+			
+			if (num > histogram.length) {
+				mostUsedSelector = selector;
 			}
 			
 			// construct histogram of usage of rules
@@ -210,14 +219,18 @@ var printResults = function() {
 	}
 	
 	console.log("\n **HISTOGRAM");
-	for (var key in histogram) {
-		console.log("use rate: " + key + ", number of selectors: " + histogram[key]);
+	for (i=0; i< histogram.length; i++) {
+		if (typeof (histogram[i]) !== 'undefined' ) {
+			console.log("match rate: " + i + ", number of selectors: " + histogram[i]);
+		}
 	}
+	console.log("\n\nMost matched selector: " + mostUsedSelector);
 	
-	console.log("Unused: " + unused);
+	console.log("\n\nUnused: " + unused);
 	console.log("Used  : " + used);
 	
-	console.log("\nLongest Selector:\n" + longestSelector);
+	console.log("\nLongest Unused Selector:\n" + longestUnusedSelector);
+	console.log(longestUnusedSelector.length + " is pretty damn long");
 	
 	outFile.flush();
 	outFile.close();
@@ -232,10 +245,11 @@ page.onConsoleMessage = function(msg) {
     console.log(msg);
 };
 
-var fname = (startUrl + "_visitedLinks.txt");
+var fname = filePrefix + "_visitedLinks.txt";
 var visitedLinksFile = fs.open(fname , 'w');
 var visited = 0;
-var addMore = true
+var addMore = true;
+var limitPagesTo = 6; // otherwise could be long time
 
 // do them sequentially, otherwise we could kick off a load of them and crush my laptop
 var process = function process() {
@@ -245,7 +259,7 @@ var process = function process() {
   // done, analyse results and shut down phantom
   if (urls.length === 0) {
 		console.log("done, summarizing and printing results to file");
-	    summary = reduce(responsesPerPage);
+	    
 		printResults(summary);
 		
 		visitedLinksFile.flush();
@@ -255,14 +269,12 @@ var process = function process() {
   else { 
 	
     url = urls.shift();
-    console.log("lets do " + url);
 	visitedLinksFile.writeLine(url);
 
     // async
 	try {
     	page.open(url, function(status){
 	
-      		console.log("started " + url);
       		if (status !== 'success') {
         		console.log("borked");
       		}
@@ -274,7 +286,7 @@ var process = function process() {
 	    		pages = resp.pages;
 
 				pages.forEach(function(page) {
-					if (urls.length > 1000) {
+					if (urls.length > limitPagesTo) {
 						addMore = false;
 					}
 			

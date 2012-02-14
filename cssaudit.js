@@ -1,313 +1,152 @@
 "use strict"; 
 
-// Crawl your website and see how much css gets used.
+/* Crawl your website and see how much css gets used.
+ *
+ * problems: it occassionally dies on fxbml tags not rendering, can I catch an exception somewhere?
+ *
+ * use notes: if you need cookies - accessing an authed page, need to remember to delete old cookie file first
+ * something gets borked if you don't
+ *
+ */
 
-// problems: it occassionally dies on fxbml tags not rendering, can I catch an exception somewhere?
-
-// read command line
+// file system
 var fs = require('fs');
 
-var urls, urlsFile, startUrl, alreadyInQueue= {};
 
-// plan is to take any number command line args of either urls starting with http, or filenames...tbc
-if (phantom.args.length < 1) {
-	console.log("usage: phantomjs filename.txt (file with urls) or phantomjs http://x http://y ... etc");
-}
-else if ( phantom.args[0].indexOf("http") < 0) {
-	// read the file
-	console.log("open file " + phantom.args[0]);
-	urlsFile = fs.read(phantom.args[0]);
-	urls = urlsFile.split("\n");
-	
-	urls.forEach(function(url){console.log("URL: " + url)});
-}
-else {
-	// url to start from
-	startUrl = phantom.args[0];
-	console.log(phantom.args[0]);
-	urls = [startUrl];
-	alreadyInQueue[startUrl] = true;
-}
+// a few includes, just put them in a separate file for manageability
+phantom.injectJs('stats.js'); // reduce, printResults
+phantom.injectJs('auditor.js'); // auditor
+phantom.injectJs('getUrls.js'); // getUrls
 
 
-// This is the big fat routine we pass into the loaded page.
-// Everything needs to be self contained, no closure over variables in outer phantom process, it  can just return data.
-// What happens: On each page we first find the stylesheet links, and links to other pages.
-// For each stylesheet, we load it via xhr, then find the selectors
-// then count their usage on the page. Return this object: {stylesheet: { selector: count} }
-// and the list of ursl to other pages we found.
-var doStuff = function() { 
-  //embellish NodeList a little
-  NodeList.prototype.forEach = Array.prototype.forEach;
-
-  console.log("processing " + window.location.href);
-
-  // this takes the elements, either a ,or link 
-  // makes absolute urls out of relative ones,
-  // ignores links to other sites
-  // and # or javascript void ones 
-  var constructOwnUrls = function(els) {
-	
-	var urls = [];
-	
-	els.forEach( function(link) {
-
-	    var directory, lastDir, tmplink = link.getAttribute('href');
-		
-		// occassionally an a has nothing under its href !?
-		if ( !tmplink || tmplink.match(/^#/) || tmplink.match(/javascript/)) {
-			//console.log("IGNORE " + tmplink);
-			return; // ignore this stuff
-		}
-
-		//append full URI if absent
-		if( tmplink.indexOf('http') !== 0 && tmplink.substr(0,2) !== '//') {
-            // make sure that relative URLs work too
-            if (tmplink.indexOf('/') != 0) {
-                lastDir = window.location.pathname.lastIndexOf('/');
-                if (lastDir > 0) {
-                    directory = window.location.pathname.substring(0, lastDir+1);
-                } else {
-                    directory = '/';
-                }
-                 tmplink = directory + tmplink;
-            }
-		    tmplink = window.location.protocol + '//' + window.location.hostname + ":" + window.location.port + tmplink;
-		}
-
-		//filter out urls not on this domain
-		if( tmplink.indexOf( window.location.hostname ) !== -1 ){
-			urls.push( tmplink );
-		}
-
-    });
-	return urls;
-  };
+// used in url loading
+var urls, startUrl, filePrefix, fname, visitedLinksFile;
+// some bookkeeping
+var summary = {}, alreadyInQueue = {};
+// hacky stuff to limit it to a few pages at a time
+var visited = 0, addMore = true, limitPagesTo = 2; // stop it after a few pages
 
 
-  var findPages = function() {
-	var pageLinks = document.querySelectorAll('a');
-	return constructOwnUrls(pageLinks);
-  };
+// processes command line for to collect urls from command line and/or file
+urls = getUrls();
+startUrl = urls[0];
+filePrefix =  startUrl.replace("http://", '').replace(/[:|\.|\/]/g, '_');
+fname = filePrefix + "_visitedLinks.txt";
+visitedLinksFile = fs.open(fname , 'w');
 
-  var findCssLinks = function() {
-	
-    var linkEls = document.querySelectorAll('link[rel=stylesheet]');
-	return constructOwnUrls(linkEls);
-  };
 
-  var findSelectors = function(sheet) {
-    //remove css comments
-	var data = sheet.replace(/\/\*[\s\S]*?\*\//gim,"");
+// obviously need to tailor this to the login page
+var login = function() {
 
-	//parse selectors. ##NEWLINE REMOVAL IS HACKISH, CAN BE DONE BETTER WITH A BETTER REGEX
-	var selectors = data.replace(/\n/g,'').match(/[^\}]+[\.\#\-\w]?(?=\{)/gim);
-	
-	return selectors;
-  };
+	console.log("start login");
+  	//	document.addEventListener('DOMContentLoaded', function(){ console.log("made it too " + window.location.href)}, false);
+	var username = "yourusername";
+	var password = "secret";
+	// id of email input = #user_email
+	// id of password = #user_password
+	// button = #user_submit,   just click it?
+	document.querySelector('#user_email').value = username;
+	document.querySelector('#user_password').value = password;
+	document.querySelector('#user_submit').click(); 
   
-  var analyzeStylesheet = function(stylesheet) {
-   
-	var selectors = findSelectors(stylesheet);
-	var results = {};
-
-	selectors.forEach(function(selector) {
-		//console.log(selector);
-		if (selector.match(/@font-face/) || selector.match(/@charset/)) {
-			return; // ignore font-face, its not relevant
-		}
-		
-		var num = null;
-		try {
-			num = document.querySelectorAll(selector).length;
-		}
-		catch(e) {
-			console.log("bad selector: " + selector + "\n" + e);
-		}
-		if (num !== null) {
-			results[selector] = num;
-		}
-	});
-	return results;
-  };
-
- 
-
-  // actual logic
-  var pages = findPages();
-  var links = findCssLinks();
-
-  console.log("found " + links.length + " stylesheet links");
- 
-  var resultsForPage = {};
-  // for each css file, load it, count use of each selector
-  links.forEach(function(link) {
-	//console.log("getting sheet " + link);
-	var request = new XMLHttpRequest();  
-	request.open('GET', link, false);  // synchronous
-	request.send(null);  
- 
-	if (request.status === 200) {  
-		resultsForPage[link] = analyzeStylesheet(request.responseText);
-	//	console.log("processed css files");
-	}
-	else {
-		console.log("xhr request fucked up");
-	}
-  });
-
-  // send it back to parent process
-  return {pages: pages, results: resultsForPage};
-};
-
-var summary = {};
-
-var reduce = function(results) {
-	
-	var sheet, result, selector;
-	
-	for (sheet in results) {
-		result = results[sheet];
-		
-		if (! summary[sheet]) {
-			summary[sheet] = {};
-		}
-		//console.log("stylesheet: " + sheet);
-		for (selector in result) {
-		//	console.log(selector + " : " + result[selector]);
-			if (typeof (summary[sheet][selector]) == 'undefined') {
-				summary[sheet][selector] = 0;
-			}
-			summary[sheet][selector] += result[selector];
-		}
-	}
-};
-
-var filePrefix =  startUrl.replace("http://", '').replace(/\//g, '').replace(":", "_").replace(/\./g, "_");
-
-var printResults = function() {
-	
-	var i, sheet, selector, result, num, used = 0, unused = 0, histogram = [], longestUnusedSelector = "", mostUsedSelector;
-	var fname = (filePrefix + "_unused_css.txt"), outFile = fs.open(fname , 'w');
-
-	for (sheet in summary) {
-		result = summary[sheet];
-	    outFile.writeLine("STYLESHEET: " + sheet);	
-		for (selector in result) {
-			num = result[selector];
-			if (num === 0) {
-				outFile.writeLine(selector + " : " + result[selector]);
-				unused += 1;
-				if ( selector.length > longestUnusedSelector.length) {
-					longestUnusedSelector = selector;
-				}
-			}
-			else {
-				used += 1;
-			}
-			
-			if (num > histogram.length) {
-				mostUsedSelector = selector;
-			}
-			
-			// construct histogram of usage of rules
-			if (! histogram[num]) {
-				histogram[num] = 0;
-			}
-			histogram[num] += 1;
-		}
-	}
-	
-	console.log("\n **HISTOGRAM");
-	for (i=0; i< histogram.length; i++) {
-		if (typeof (histogram[i]) !== 'undefined' ) {
-			console.log("match rate: " + i + ", number of selectors: " + histogram[i]);
-		}
-	}
-	console.log("\n\nMost matched selector: " + mostUsedSelector);
-	
-	console.log("\n\nUnused: " + unused);
-	console.log("Used  : " + used);
-	
-	console.log("\nLongest Unused Selector:\n" + longestUnusedSelector);
-	console.log(longestUnusedSelector.length + " is pretty damn long");
-	
-	outFile.flush();
-	outFile.close();
+	console.log("kicked off login process, now we're at " + window.location.href);
+	return "no errors so far";
 };
 
 
-
-// *** now something actually happens
+// ****  now something actually happens, create page and do stuff
 var page = require('webpage').create();
 
 page.onConsoleMessage = function(msg) {
     console.log(msg);
 };
 
-var fname = filePrefix + "_visitedLinks.txt";
-var visitedLinksFile = fs.open(fname , 'w');
-var visited = 0;
-var addMore = true;
-var limitPagesTo = 6; // otherwise could be long time
+
+// for pages we want to audit css
+var doOnLoad = function(status) {
+
+	var resp;
+	
+	if (status !== 'success') {
+  		console.log("something went wrong with this page " + status);
+		phantom.exit();
+	}
+	else {
+	
+    	console.log("try processing the css");
+		//	page.render("homepage.png");
+		resp = page.evaluate(auditor);
+	 
+		// add this pages results to summary
+		reduce(summary, resp.results);
+		alreadyInQueue[resp.currentPage] = true; // alreadyDoneOrInQ
+		visitedLinksFile.writeLine(resp.currentPage);
+
+		resp.pages.forEach(function(page) {
+	  		if (urls.length > limitPagesTo) {
+				addMore = false;
+			}
+
+			if (addMore && !alreadyInQueue[page] ) {
+				//console.log("ENQUEUE: " + page);
+
+				urls.push(page);
+				alreadyInQueue[page] = true;
+			}
+		});
+	  	console.log("next call of process!" + visited);
+	  	visited++;
+		console.log("process??? " + typeof process);
+	  	process(); // do it all again
+    }
+};
+
 
 // do them sequentially, otherwise we could kick off a load of them and crush my laptop
 var process = function process() {
+	
+	console.log("length: " + urls.length);
   
-  var url, resp, pages, results, summary;
+  	var url = urls.length > 0 ? urls.shift() : false, 
+		needsLogin = ( url &&  url.match(/signin/) ),
+		summary;
 
-  // done, analyse results and shut down phantom
-  if (urls.length === 0) {
-		console.log("done, summarizing and printing results to file");
+	console.log("next url to process is " + url);
+	
+  	// done, analyse results and shut down phantom
+	if ( !url ) {
+    	console.log("done, summarizing and printing results to file");
 	    
 		printResults(summary);
-		
 		visitedLinksFile.flush();
 		visitedLinksFile.close();
     	phantom.exit();
-  }
-  else { 
-	
-    url = urls.shift();
-	visitedLinksFile.writeLine(url);
+  	}
 
-    // async
-	try {
-    	page.open(url, function(status){
+  	// if we need to login its a bit more complicated
+  	else if (needsLogin) {
 	
-      		if (status !== 'success') {
-        		console.log("borked");
-      		}
-      		else {
-	    		// sync bit is here only I think, so the recursion has to be here
-        		resp = page.evaluate(doStuff); // hmmm, should be a map of all selectors??/ stylesheets -> selectors for understandability
-				// better to do the reduce part here!
-	    		reduce(resp.results);
-	    		pages = resp.pages;
-
-				pages.forEach(function(page) {
-					if (urls.length > limitPagesTo) {
-						addMore = false;
-					}
+		// open the login url
+		page.open(url, function(status) {
+			//console.info("opening " + url);
+			var resp;
+			if (status !== 'success') {
+  				console.log("borked");
+			}
+			else {
+				// reset the onLoadFinished method, so we know what to do when we get  once we submit the login form
+				page.onLoadFinished = doOnLoad;
 			
-					if (addMore && !alreadyInQueue[page] ) {
-						//console.log("ENQUEUE: " + page);
-				
-						urls.push(page);
-						alreadyInQueue[page] = true;
-					}
-				});
-				console.log("next call of process!" + visited);
-				visited++;
-	    		process(); 
-      		}
-    	});
+				resp = page.evaluate(login); // hmmm, should be a map of all selectors??/ stylesheets -> selectors for understandability
+				console.log("recieved " + resp);
+			}
+		});
 	}
-	catch(e) {
-		console.log(url + " fucked up on loading"); // ???
-	}
-   
-  }
+
+	// 
+	else { 
+    	page.open(url, doOnLoad);
+  	}
 };
 
-process();
+process(); // finally kick off the whole production

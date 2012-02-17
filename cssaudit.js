@@ -7,6 +7,10 @@
  * use notes: if you need cookies - accessing an authed page, need to remember to delete old cookie file first
  * something gets borked if you don't
  *
+ * Next idea: as we process, spit out a bunch of html files: a summary page for aggregated data, 
+ * and a link to a page for each real page analyzed with more detail about that page.
+ * pretty bad ass huh!
+ *
  */
 
 // file system
@@ -20,18 +24,30 @@ phantom.injectJs('getUrls.js'); // getUrls
 
 
 // used in url loading
-var urls, startUrl, filePrefix, fname, visitedLinksFile;
+var urls, startUrl, fname, fprefix, visitedLinksFile;
 // some bookkeeping
 var summary = {}, alreadyInQueue = {};
 // hacky stuff to limit it to a few pages at a time
 var visited = 0, addMore = true, limitPagesTo = 2; // stop it after a few pages
 
 
+// take sth like http://www.xyz.com/thing1/id1... etc
+// and turn it into something thats works as file name
+// then append something interesting on the end to distinguish it from other files
+var makeOutputFileName = function(url) {
+	return "results/" +  url.replace("http://", '').replace(/[:|\.|\/]/g, '_');
+};
 // processes command line for to collect urls from command line and/or file
 urls = getUrls();
-startUrl = urls[0];
-filePrefix =  startUrl.replace("http://", '').replace(/[:|\.|\/]/g, '_');
-fname = filePrefix + "_visitedLinks.txt";
+
+if (!urls || urls.length == 0) {
+	console.log("No urls, nothing to do");
+	phantom.exit();
+}
+
+fprefix = makeOutputFileName(urls[0]);
+fname = fprefix + "_visitedLinks.txt";
+console.log(fname);
 visitedLinksFile = fs.open(fname , 'w');
 
 
@@ -40,8 +56,8 @@ var login = function() {
 
 	console.log("start login");
   	//	document.addEventListener('DOMContentLoaded', function(){ console.log("made it too " + window.location.href)}, false);
-	var username = "yourusername";
-	var password = "secret";
+	var username = "hugh.richardson@patch.com";
+	var password = "admin";
 	// id of email input = #user_email
 	// id of password = #user_password
 	// button = #user_submit,   just click it?
@@ -74,8 +90,8 @@ var doOnLoad = function(status) {
 	else {
 	
     	console.log("try processing the css");
-		//	page.render("homepage.png");
 		resp = page.evaluate(auditor);
+		visited++;
 	 
 		// add this pages results to summary
 		reduce(summary, resp.results);
@@ -94,9 +110,9 @@ var doOnLoad = function(status) {
 				alreadyInQueue[page] = true;
 			}
 		});
-	  	console.log("next call of process!" + visited);
-	  	visited++;
-		console.log("process??? " + typeof process);
+	  	//console.log("next call of process!" + visited);
+	  
+	//	console.log("process??? " + typeof process);
 	  	process(); // do it all again
     }
 };
@@ -117,7 +133,8 @@ var process = function process() {
 	if ( !url ) {
     	console.log("done, summarizing and printing results to file");
 	    
-		printResults(summary);
+		//printResults(summary);
+		printResults(fprefix)
 		visitedLinksFile.flush();
 		visitedLinksFile.close();
     	phantom.exit();

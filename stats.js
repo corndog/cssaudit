@@ -1,3 +1,10 @@
+// relevant stuff is return {pages: pages, results: resultsForPage, currentPage: url, size: bodySize};
+var reportForPage = function(data) {
+
+	
+};
+
+
 var reduce = function(summary, results) {
 	
 	var sheet, result, selector;
@@ -25,6 +32,8 @@ var printResults = function(filePrefix) {
 	
 	var i, sheet, selector, result, num, used = 0, unused = 0, histogram = [], longestUnusedSelector = "", mostUsedSelector;
 	var fname = (filePrefix + "_unused_css.txt"), outFile = fs.open(fname , 'w');
+
+	console.log( "open file?? " + fname);
 
 	for (sheet in summary) {
 		result = summary[sheet];

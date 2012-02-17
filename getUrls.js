@@ -4,12 +4,11 @@
 
 fs = fs || require('fs');  // let's load it on main page for now
 
-var urlsFile;
 
 var getUrls = function() {
 	//console.log("getting urls");
 	var urls = [];
-	// plan is to take any number command line args of either urls starting with http, or filenames...tbc
+	
 	if (phantom.args.length < 1) {
 		console.log("usage: phantomjs filename.txt (file with urls) or phantomjs http://x http://y ... etc");
 		phantom.exit();
@@ -19,7 +18,7 @@ var getUrls = function() {
 	else {
 
 		phantom.args.forEach(function(arg){
-			
+			var urlsFile;
 			if (arg.match('/^--/') ) {
 				// ignore, its an arg for phantom
 				// actually I think phantom has already eaten it, oh well

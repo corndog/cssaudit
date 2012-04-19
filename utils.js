@@ -40,3 +40,21 @@ var getUrls = function() {
 	return urls;
 };
 
+// obviously need to tailor this to the login page
+var login = function() {
+
+	console.log("start login");
+  	//	document.addEventListener('DOMContentLoaded', function(){ console.log("made it too " + window.location.href)}, false);
+	var username = "hugh.richardson@patch.com";
+	var password = "admin";
+	// id of email input = #user_email
+	// id of password = #user_password
+	// button = #user_submit,   just click it?
+	document.querySelector('#user_email').value = username;
+	document.querySelector('#user_password').value = password;
+	document.querySelector('#user_submit').click(); 
+  
+	console.log("kicked off login process, now we're at " + window.location.href);
+	return "no errors so far";
+};
+

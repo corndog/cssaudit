@@ -3,14 +3,17 @@
  * What happens: On each page we first find the stylesheet links, and links to other pages.
  * For each stylesheet, we load it via xhr, then find the selectors
  * then count their usage on the page. Return this object: {stylesheet: { selector: count} }
- * and the list of ursl to other pages we found., and the url we just visited
+ * and the list of urls to other pages we found., and the url we just visited
+ *
+ * If we are going to break a selector down, need more complex structure : selector : { count: x, pieces: n, pieceCounts: { selector1: n, selector2: m}}
+ *
  */
 
 var auditor = function() { 
 	//embellish NodeList a little
 	NodeList.prototype.forEach = Array.prototype.forEach;
 	
-	var bodySize = document.getElementsByTagName('body')[0].getElementsByTagName('*').length
+	var bodySize = document.getElementsByTagName('body')[0].getElementsByTagName('*').length;
 	console.log("Body Els: " + bodySize);
 
 	var url = window.location.href;
@@ -95,6 +98,8 @@ var auditor = function() {
 		var results = {};
 
 		selectors.forEach(function(selector) {
+			var res = {};
+			var pieces, pieceCounts = {};
 			var num = null;
 			if (selector.match(/@font-face/) || selector.match(/@charset/)) {
 				return; // ignore font-face, its not relevant
@@ -107,7 +112,23 @@ var auditor = function() {
 				console.log("bad selector: " + selector + "\n" + e);
 			}
 			if (num !== null) {
-				results[selector] = num;
+				res.count = num;
+				pieces = selector.split(',');
+				//res.numpieces = pieces.length can figure it out
+				
+				// analyse each piece if the whole thing is not too heavily used
+				if (pieces.length > 1 && num < 25) {
+					
+					//console.log("splitting " + selector);
+					pieces.forEach(function(sel){
+						pieceCounts[sel] = document.querySelectorAll(sel).length;
+						//console.log(sel + " : " + pieceCounts[sel]);
+					});
+					
+					res.pieceCounts = pieceCounts;
+				}
+				
+				results[selector] = res;
 			}
 		});
 		return results;
@@ -130,9 +151,11 @@ var auditor = function() {
 			//	console.log("processed css files");
 		}
 		else {
-			console.log("xhr request fucked up");
+			console.log("error in xhr request");
 		}
 	});
+
+	console.log("finished " + url);
 
   	// send it back to parent process
 	return {pages: pages, results: resultsForPage, currentPage: url, size: bodySize};

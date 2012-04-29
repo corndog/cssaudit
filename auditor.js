@@ -25,15 +25,13 @@ var auditor = function() {
  	* ignores links to other sites
  	* and # or javascript void ones . stolen from helium, then embellished
 	*/
-  	var constructOwnUrls = function(els, iscss) {
+	var constructOwnUrls = function(els, iscss) {
 	
 		var urls = [];
 	
 		els.forEach( function(link) {
 
 	    	var directory, lastDir, tmplink = link.getAttribute('href');
-	
-		//	console.log("link: " + tmplink);
 		
 			// occassionally an a has nothing under its href !?
 			if ( !tmplink || tmplink.match(/^#/) || tmplink.match(/javascript/)) {
@@ -43,17 +41,17 @@ var auditor = function() {
 
 			//append full URI if absent
 			if( tmplink.indexOf('http') !== 0 && tmplink.substr(0,2) !== '//') {
-            	// make sure that relative URLs work too
-            	if (tmplink.indexOf('/') != 0) {
-                	lastDir = window.location.pathname.lastIndexOf('/');
-                	if (lastDir > 0) {
-                    	directory = window.location.pathname.substring(0, lastDir+1);
-                	} else {
-                    	directory = '/';
-                	}
-                 	tmplink = directory + tmplink;
-            	}
-		    	tmplink = window.location.protocol + '//' + window.location.hostname + ":" + window.location.port + tmplink;
+				// make sure that relative URLs work too
+				if (tmplink.indexOf('/') != 0) {
+					lastDir = window.location.pathname.lastIndexOf('/');
+					if (lastDir > 0) {
+						directory = window.location.pathname.substring(0, lastDir+1);
+					} else {
+						directory = '/';
+					}
+					tmplink = directory + tmplink;
+				}
+				tmplink = window.location.protocol + '//' + window.location.hostname + ":" + window.location.port + tmplink;
 			}
 
 			//filter out urls not on this domain
@@ -64,7 +62,7 @@ var auditor = function() {
 				console.log("OOPS!! Can't get " + tmplink);
 			}
 
-    	});
+		});
 		return urls;
 	};
 

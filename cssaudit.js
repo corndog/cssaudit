@@ -30,7 +30,7 @@ phantom.injectJs('utils.js'); // getUrls, login
 
 // used in url loading
 var urls, startUrl, fname, fprefix, visitedLinksFile;
-// some bookkeeping
+// bookkeeping
 var summary = {}, alreadyInQueue = {};
 // hacky stuff to limit it to a few pages at a time
 var visited = 0, addMore = true, limitPagesTo = 2; // stop it after a few pages
@@ -61,7 +61,7 @@ visitedLinksFile = fs.open(fname , 'w');
 var page = require('webpage').create();
 
 page.onConsoleMessage = function(msg) {
-    console.log(msg);
+	console.log(msg);
 };
 
 
@@ -71,12 +71,12 @@ var doOnLoad = function(status) {
 	var resp;
 	
 	if (status !== 'success') {
-  		console.log("something went wrong with this page " + status);
+		console.log("something went wrong with this page " + status);
 		phantom.exit();
 	}
 	else {
 	
-    	console.log("try processing the css");
+		console.log("try processing the css");
 		resp = page.evaluate(auditor);
 		visited++;
 	 
@@ -111,28 +111,26 @@ var process = function process() {
 	
 	console.log("length: " + urls.length);
   
-  	var url = urls.length > 0 ? urls.shift() : false, 
-		needsLogin = ( url &&  url.match(/signin/) );
+	var url = (urls.length > 0 ? urls.shift() : false), needsLogin = ( url &&  url.match(/signin/) );
 
 	console.log("next url to process is " + url);
 	
   	// done, analyse results and shut down phantom
 	if ( !url ) {
-    	console.log("done, summarizing and printing results to file");
+		console.log("done, summarizing and printing results to file");
 	    
 		//printResults(summary);
 		printResults(fprefix)
 		visitedLinksFile.flush();
 		visitedLinksFile.close();
-    	phantom.exit();
-  	}
+		phantom.exit();
+	}
 
   	// if we need to login its a bit more complicated
-  	else if (needsLogin) {
+	else if (needsLogin) {
 	
 		// open the login url
 		page.open(url, function(status) {
-			//console.info("opening " + url);
 			var resp;
 			if (status !== 'success') {
   				console.log("borked");

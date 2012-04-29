@@ -45,8 +45,8 @@ var login = function() {
 
 	console.log("start login");
   	//	document.addEventListener('DOMContentLoaded', function(){ console.log("made it too " + window.location.href)}, false);
-	var username = "hugh.richardson@patch.com";
-	var password = "admin";
+	var username = "username";
+	var password = "password";
 	// id of email input = #user_email
 	// id of password = #user_password
 	// button = #user_submit,   just click it?

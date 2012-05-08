@@ -4,72 +4,78 @@ var reportForPage = function(data) {
 	
 };
 
-// for each stylesheet : { count x, pieces: n, pieceCounts: { selector1: n, selector2: m}}
-// gack this is getting messy
+/*  
+ * { sheetName: {
+ *		sheetSize: x, // length == number of bytes
+ *		selectorGroups : [] // ordered, so they line up with the actual sheet
+ *		dataForSelectorGroups: {
+ *			// key for each one
+ *			selectorGroup : {
+ *				count: x, // matches
+ *				selectors: [] // in order
+ *				dataForSelectors { 
+ *					// key for each one
+ *					selector: n
+ *				} 
+ *			}
+ *		}
+ *	}
+ */
 var reduce = function(summary, results) {
 	
-	var styleSheet, result, selector, piece, resultsForSelector, sel, pieces, pieceCounts, totalPieceCounts;
+	var sheetName, dataForSheet, dataForSelectorGroups, dataForSelectorGroup, summaryForSelectorGroups, selectorGroup, 
+		summaryForSelectorGroup, dataForSelectors, summaryForSelectors, selector;
 	
 	
-	for (styleSheet in results) {
-		result = results[styleSheet];
+	for (sheetName in results) {
+		dataForSheet = results[sheetName];
 		
-		if (! summary[styleSheet]) {
-			summary[styleSheet] = {};
+		if (! summary[sheetName]) {
+			summary[sheetName] = dataForSheet;
+			continue; // done with this stylesheet for this turn
 		}
-		//console.log("stylesheet: " + sheet);
-		for (selector in result) {
-			pieces = selector.split(',');
-		//	console.log(selector + " : " + result[selector]);
-			resultsForSelector = result[selector];
-			pieceCounts = resultsForSelector.pieceCounts;
+		
+		// otherwise, just add counts to existing data
+		dataForSelectorGroups = dataForSheet.dataForSelectorGroups;
+		summaryForSelectorGroups = summary[sheetName].dataForSelectorGroups;
+		for (selectorGroup in dataForSelectorGroups) {
+			dataForSelectorGroup = dataForSelectorGroups[selectorGroup];
+			summaryForSelectorGroup = summaryForSelectorGroups[selectorGroup];
+			summaryForSelectorGroup.count += dataForSelectorGroup.count;
 			
-			if (typeof (summary[styleSheet][selector]) == 'undefined') {
-				summary[styleSheet][selector] = {count: 0, pieces: pieces.length, pieceCounts: {}};
-				pieces.forEach(function(sel){
-					summary[styleSheet][selector].pieceCounts[sel] = 0;
-				});
-			}
-			totalsForSelector = summary[styleSheet][selector];
-			totalsForSelector.count += resultsForSelector.count;
+			dataForSelectors = dataForSelectorGroup.dataForSelectors;
+			summaryForSelectors = summaryForSelectorGroup.dataForSelectors;
 
-			totalPieceCounts = totalsForSelector.pieceCounts; // mpa
-			
-			
-			if (pieceCounts) {
-				for (sel in pieceCounts) {
-					totalPieceCounts[sel] += pieceCounts[sel];
-					console.log(sel + " + " + totalPieceCounts[sel]);
-				}
+			for (selector in dataForSelectors) {
+				summaryForSelectors[selector] += dataForSelectors[selector];
 			}
-			
 		}
 	}
 };
 
 
 
-var printResults = function(filePrefix) {
+var printResults = function(dataFile) {
 	
-	var i, sheet, selector, result, num, used = 0, unused = 0, histogram = [], longestUnusedSelector = "", mostUsedSelector, resultsForSelector, sel;
-	var fname = (filePrefix + "_unused_css.txt"), outFile = fs.open(fname , 'w');
+	var i, sheet, selector, result, num, used = 0, unused = 0, histogram = [], histOutput = [], longestUnusedSelector = "", mostUsedSelector, resultsForSelector, sel;
+	var fname = (filePrefix + "_unused_css.txt"), outFile = fs.open(fname , 'w'), stylesSize = 0;
 
 	console.log( "open file?? " + fname + "\nsummary??");
 	console.dir(summary);
 
 	for (sheet in summary) {
 		
-		console.log("sheet: " + sheet);
-		console.log( "outfile: " + outFile);
-		
+		//console.log( "outfile: " + outFile);
 		
 		outFile.writeLine("STYLESHEET: " + sheet);	
 		result = summary[sheet];
+		console.log("sheet: " + sheet + " size: " + result.pageSize);
+		stylesSize += result.pageSize;
 	    
 		for (selector in result) {
 			resultsForSelector = result[selector];
 
-			console.log("\n\nSelector: " + selector + "\nTotal: " + resultsForSelector.count);
+			//console.log("\n\nSelector: " + selector + "\nTotal: " + resultsForSelector.count);
 			
 			num = resultsForSelector.count;
 			if (num === 0) {
@@ -111,6 +117,7 @@ var printResults = function(filePrefix) {
 	for (i=0; i< histogram.length; i++) {
 		if (typeof (histogram[i]) !== 'undefined' ) {
 			console.log("match rate: " + i + ", number of selectors: " + histogram[i]);
+			histOutput.push({index: i, value: histogram[i]});
 		}
 	}
 	console.log("\n\nMost matched selector: " + mostUsedSelector);
@@ -123,4 +130,18 @@ var printResults = function(filePrefix) {
 	
 	outFile.flush();
 	outFile.close();
+
+	// write the historgram data
+	outFile = fs.open('data/data.js', 'w');
+	outFile.writeLine('var data = ');
+	outFile.writeLine(JSON.stringify(histOutput));
+	outFile.writeLine(';');
+	outFile.writeLine('var stylesSize = ' + (parseInt(stylesSize/1000)) + ';');
+	outFile.writeLine('var allData = ' + JSON.stringify(summary) + ';');
+	outFile.flush();
+	outFile.close();
+
+	// so far this matches up with the size in bytes reported by osx. Guess it works if your css is utf8 ?
+	console.log("\ntotal amount of stylesheet load: " + (parseInt(stylesSize/1000)) + " kilobytes");
+
 };

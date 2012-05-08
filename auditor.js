@@ -1,21 +1,34 @@
-/* This is the big fat routine we pass into the loaded page.
- * Everything needs to be self contained, no closure over variables in outer phantom process, it  can just return data.
- * What happens: On each page we first find the stylesheet links, and links to other pages.
- * For each stylesheet, we load it via xhr, then find the selectors
- * then count their usage on the page. Return this object: {stylesheet: { selector: count} }
- * and the list of urls to other pages we found., and the url we just visited
+/* This is the function we pass into the loaded page.
+ * Everything needs to be self contained, no closure over variables in outer phantom process. It can only return data.
+ * On each page we first find the stylesheet links, and links to other pages.
+ * For each stylesheet, we load it via xhr, then find the selector groups and count their usage
+ * then we break the big set of selectors into individual selectors and count those matches too
+ * We also return the list of urls to other pages.
  *
- * If we are going to break a selector down, need more complex structure : selector : { count: x, pieces: n, pieceCounts: { selector1: n, selector2: m}}
+ * Main data object we return:
+ * { sheetName: {
+ *		sheetSize: x, // length == number of bytes
+ *		selectorGroups : [] // ordered, so they line up with the actual sheet
+ *		dataForSelectorGroups: {
+ *			// key for each one
+ *			selectorGroup : {
+ *				count: x, // matches
+ *				selectors: [] // in order
+ *				dataForSelectors { 
+ *					// key for each one
+ *					selector: n
+ *				} 
+ *			}
+ *		}
+ *	}
  *
+ * to allow cross-domain xhr --web-security=no
  */
 
 var auditor = function() { 
-	//embellish NodeList a little
-	NodeList.prototype.forEach = Array.prototype.forEach;
 	
+	NodeList.prototype.forEach = Array.prototype.forEach;
 	var bodySize = document.getElementsByTagName('body')[0].getElementsByTagName('*').length;
-	console.log("Body Els: " + bodySize);
-
 	var url = window.location.href;
 	console.log("\nprocessing css for " + url + "\n");
 
@@ -35,11 +48,10 @@ var auditor = function() {
 		
 			// occassionally an a has nothing under its href !?
 			if ( !tmplink || tmplink.match(/^#/) || tmplink.match(/javascript/)) {
-				//console.log("IGNORE " + tmplink);
 				return; // ignore this stuff
 			}
 
-			//append full URI if absent
+			// append full URI if absent
 			if( tmplink.indexOf('http') !== 0 && tmplink.substr(0,2) !== '//') {
 				// make sure that relative URLs work too
 				if (tmplink.indexOf('/') != 0) {
@@ -54,14 +66,10 @@ var auditor = function() {
 				tmplink = window.location.protocol + '//' + window.location.hostname + ":" + window.location.port + tmplink;
 			}
 
-			//filter out urls not on this domain
-			if( tmplink.indexOf( window.location.hostname ) !== -1 ){
+			//filter out pages not on this domain, can do cross domain xhr now for css
+			if(iscss || tmplink.indexOf( window.location.hostname ) !== -1 ){
 				urls.push( tmplink );
 		    }
-			else if (iscss) {
-				console.log("OOPS!! Can't get " + tmplink);
-			}
-
 		});
 		return urls;
 	};
@@ -73,10 +81,8 @@ var auditor = function() {
 	};
 
 	var findCssLinks = function() {
-	
 		var linkEls = document.querySelectorAll('link[rel=stylesheet]');
-		console.log("FOUND : " + linkEls.length + " link tags to go find");
-		return constructOwnUrls(linkEls, true); // do some different debug/message if its css
+		return constructOwnUrls(linkEls, true); 
   	};
 
 	// stolen from helium-css
@@ -90,43 +96,45 @@ var auditor = function() {
 		return selectors;
   	};
   
+  	// returns list of selectorGroups and data: {}
   	var analyzeStylesheet = function(stylesheet) {
    
-		var selectors = findSelectors(stylesheet);
-		var results = {};
+		var selectorGroups = findSelectors(stylesheet);
+		var results = {
+			sheetSize: stylesheet.length,
+			selectorGroups: selectorGroups,
+			dataForSelectorGroups: {}
+		}; 
 
-		selectors.forEach(function(selector) {
-			var res = {};
-			var pieces, pieceCounts = {};
-			var num = null;
-			if (selector.match(/@font-face/) || selector.match(/@charset/)) {
+		selectorGroups.forEach(function(selectorGroup) {
+			// count, list of selectors, data: { selector: count}
+			var data = {
+				dataForSelectors: {} // individual selectors and counts
+			};
+			var numMatches = null;
+			if (selectorGroup.match(/@font-face/) || selectorGroup.match(/@charset/)) {
 				return; // ignore font-face, its not relevant
 			}
 		
 			try {
-				num = document.querySelectorAll(selector).length;
+				numMatches = document.querySelectorAll(selectorGroup).length;
 			}
 			catch(e) {
 				console.log("bad selector: " + selector + "\n" + e);
 			}
-			if (num !== null) {
-				res.count = num;
-				pieces = selector.split(',');
-				//res.numpieces = pieces.length can figure it out
+			if (numMatches !== null) {
+				data.count = numMatches;
+				selectors = selectorGroup.split(',');
+				data.selectors = selectors;
 				
 				// analyse each piece if the whole thing is not too heavily used
-				if (pieces.length > 1 && num < 25) {
-					
-					//console.log("splitting " + selector);
-					pieces.forEach(function(sel){
-						pieceCounts[sel] = document.querySelectorAll(sel).length;
-						//console.log(sel + " : " + pieceCounts[sel]);
+				if (selectors.length > 1) {
+					selectors.forEach(function(selector){
+						data.dataForSelectors[selector] = document.querySelectorAll(selector).length;
 					});
-					
-					res.pieceCounts = pieceCounts;
 				}
 				
-				results[selector] = res;
+				results.dataForSelectorGroups[selectorGroup] = data;
 			}
 		});
 		return results;
@@ -135,18 +143,18 @@ var auditor = function() {
   	// actual logic
   	var pages = findPages();
   	var links = findCssLinks();
+  	console.log("FOUND: " + links.length + " stylesheets");
 
   	var resultsForPage = {};
   	// for each css file, load it, count use of each selector
-  	links.forEach(function(link) {
-		console.log("getting sheet " + link);
+  	links.forEach(function(sheetName) {
+		console.log("getting sheet " + sheetName);
 		var request = new XMLHttpRequest();  
-		request.open('GET', link, false);  // synchronous
+		request.open('GET', sheetName, false);  // synchronous
 		request.send(null);  
 
 		if (request.status === 200) {  
-			resultsForPage[link] = analyzeStylesheet(request.responseText);
-			//	console.log("processed css files");
+			resultsForPage[sheetName] = analyzeStylesheet(request.responseText);
 		}
 		else {
 			console.log("error in xhr request");

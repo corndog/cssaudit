@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+
+    <title>css data</title>
+    <meta name="description" content="your css usage" />
+    <meta name="author" content="Hugh Richardson" />
+
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+    <link rel="stylesheet" href="style.css" />
+    <script src="d3.v2.js"></script>
+    <script src="../data/data.js"></script>
+
+    <style>
+    
+	</style>
+</head>
+<body>
+
+<script>
+
+var w = 25, h = 600;
+
+var x = d3.scale.linear()
+			.domain([0,1])
+			.range([0,w]);
+
+var y = d3.scale.linear()
+			.domain([0, 100])
+			.rangeRound([0,h]);
+
+var chart = d3.select('body').append('svg')
+				.attr('class', 'chart')
+				.attr('width', (w * data.length - 1) + 5)
+				.attr('height', h + 20);
+
+chart.selectAll('rect')
+	.data(data)
+	.enter().append('rect')
+		.attr('x', function(d, i){ return x(i) - 0.5; })
+		.attr('y', function(d){ return h - y(d.value) - 0.5;})
+		.attr('width', w)
+		.attr('height', function(d){return y(d.value);});
+
+
+chart.append('line')
+	.attr('x1', 0)
+	.attr('x2', w * data.length)
+	.attr('y1', h - 0.5)
+	.attr('y2', h - 0.5)
+	.style('stroke', '#000');
+
+ // ********* text *****
+ chart.selectAll('text')
+		.data(data)
+		.enter().append('text')
+			.attr('x', function(d, i){ return x(i) + 6;} )
+			.attr('y', function(d){ return Math.max(8, h - y(d.value) - 6);})
+			.attr('dx', -3)
+			.attr('dy', '.25em')
+			.attr('text-anchor', 'bottom')
+			.attr('font-size', '75%')
+			.text(function(d){return d.value;});
+
+chart.selectAll('text.label')
+		.data(data)
+		.enter().append('text')
+			.attr('x', function(d, i){ return x(i) - (("" + d).length/2) + 16;} )
+			.attr('y', h + 10)
+			.attr('dx', -3)
+			.attr('dy', '.25em')
+			.attr('text-anchor', 'bottom')
+			.attr('font-size', '75%')
+			.text(function(d){return d.index;});
+
+d3.select('body').append('div');
+
+d3.select('body').append('div')
+	.data([window.stylesSize]).
+	append('text')
+	.text(function(d) { return "Total of " + d + " kilobytes of css (uncompressed, assuming its utf8)";});
+
+</script>
+
+    
+</body>
+</html>

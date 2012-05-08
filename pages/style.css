@@ -1,0 +1,25 @@
+.chart rect {
+	stroke: white;
+	fill: steelblue;
+}
+
+
+div.sheet-link {
+	cursor: pointer;
+	padding: 5px 0px 10px 10px;
+	font-size: 120%;
+	border-bottom: 1px solid gray;
+	color: #4682b4;
+}
+
+div.num {
+	float: left;
+	width: 5%;
+}
+
+div.selector {
+	width: 92%;
+	height: 40px;
+	float: left;
+	overflow: scroll;
+}

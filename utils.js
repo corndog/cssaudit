@@ -1,39 +1,47 @@
 /*
  * Load urls from command line params, either the url(s) themselves or a file
+ * NOTE urls all need to start with http or phantom won't understand them
  */
 
-fs = fs || require('fs');  // let's load it on main page for now
+var fs = require('fs');  // let's load it on main page for now
 
-
+// plan is to support a number of options
+// 1) hand in one more urls on the command line
+// 2) read a file with a list of urls
+// 3) in either case either just those urls or allow crawling
+// 4) provide a way of putting some hard limit on the number of pages hit
+//    to stop things running for an excessive amount of time
 var getUrls = function() {
 	//console.log("getting urls");
-	var urls = [];
+	var fname, urls = [];
 	
 	if (phantom.args.length < 1) {
 		console.log("usage: phantomjs filename.txt (file with urls) or phantomjs http://x http://y ... etc");
 		phantom.exit();
 	}
-	// process command line args, urls starting with http and/or filenames, file contains urls each on a new line
-	// this info will seed the crawler
-	else {
-
-		phantom.args.forEach(function(arg){
-			var urlsFile;
-			if (arg.match('/^--/') ) {
-				// ignore, its an arg for phantom
-				// actually I think phantom has already eaten it, oh well
-			}
-			else if ( arg.match(/http:/) ) {
-				urls.push(arg);
-			}
-			else {
-				urlsFile = fs.read(arg);
-				(urlsFile.split("\n")).forEach(function(url){
-					console.log("found " + url);
-					urls.push(url);
-				});
-			}
+	// otherwise process command line args, urls starting with http and/or filenames, file contains urls each on a new line
+	
+	// it url(s)
+	else if ( phantom.args[0].match(/http:/) ) {
+		console.log("command line urls");
+		phantom.args.forEach(function(url){
+			urls.push(url);
 		});
+	}
+	// should be a file containing urls
+	else {
+		fname = phantom.args[0];
+		console.log('looking for file ' + fname);
+		var urlsFile = fs.read(fname);
+		if (urlsFile) {
+			urlsFile.split("\n").forEach(function(url){
+				console.log("found " + url);
+				urls.push(url);
+			});
+		}
+		else {
+			console.log("couldn't open file " + fname);
+		}
 	}
 	urls.forEach(function(url) {console.log(url);});
 	

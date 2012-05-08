@@ -1,6 +1,5 @@
 This is a program that crawls your/a website and reports on the usage or lack thereof of the css rules in your stylesheets.
-The approach, and some code is taken from the helium-css project, except that instead of adding the necessary javascript 
-to your app this uses phantom.js to load the page(s) and then runs the css analysis.
-This is work in progress and I have a few more plans and ideas.
+The approach, and some code is taken from the helium-css project, except that instead of adding the necessary javascript to your app this uses phantom.js to load the page(s) and then runs the css analysis.
+This is very much work in progress.
 
 

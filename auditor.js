@@ -22,7 +22,6 @@
  *		}
  *	}
  *
- * to allow cross-domain xhr --web-security=no
  */
 
 var auditor = function() { 
@@ -111,7 +110,8 @@ var auditor = function() {
 			var data = {
 				dataForSelectors: {} // individual selectors and counts
 			};
-			var numMatches = null;
+			var selectors, numMatches = null;
+			
 			if (selectorGroup.match(/@font-face/) || selectorGroup.match(/@charset/)) {
 				return; // ignore font-face, its not relevant
 			}
@@ -120,7 +120,7 @@ var auditor = function() {
 				numMatches = document.querySelectorAll(selectorGroup).length;
 			}
 			catch(e) {
-				console.log("bad selector: " + selector + "\n" + e);
+				console.log("bad selector: " + selectorGroup + "\n" + e);
 			}
 			if (numMatches !== null) {
 				data.count = numMatches;

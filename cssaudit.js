@@ -9,16 +9,17 @@
  *
  * Idea is to collect the data in a big js object, then write it to a file as JSON.
  * Then we can a webpage/pages that read this data, providing a view interface.
+ * 
+ * to allow cross-domain xhr --web-security=no
  *
  */
-
-// a few includes, just put them in a separate file for manageability
+var fs = require('fs');
 phantom.injectJs('stats.js'); // reduce, printResults
 phantom.injectJs('auditor.js'); // auditor
 phantom.injectJs('utils.js'); // getUrls, login
 
-// used in url loading
-var urls, startUrl, crawl = false; // look at this later
+
+var urls, crawl = false;
 // bookkeeping
 var summary = {}, alreadyInQueue = {}, dataRoot = "data.js"; // file to write the data to, as JSON/js
 // hacky stuff to limit it to a few pages at a time
@@ -48,6 +49,7 @@ page.onConsoleMessage = function(msg) {
 var doOnLoad = function(status) {
 
 	var resp;
+	console.log("page loaded");
 	
 	if (status !== 'success') {
 		console.log("something went wrong with this page " + status);
@@ -61,7 +63,6 @@ var doOnLoad = function(status) {
 		if (crawl) {
 			resp.pages.forEach(function(page) {
 				if (!alreadyInQueue[page] ) {
-					console.log("ENQUEUE: " + page);
 					urls.push(page);
 					alreadyInQueue[page] = true;
 				}
@@ -76,6 +77,8 @@ var process = function process() {
   
 	var url = (urls.length > 0 ? urls.shift() : false), 
 		needsLogin = ( url &&  url.match(/signin/) );
+
+	console.log("process next url: " + url);
 	
   	// done, analyse results and shut down phantom
 	if ( !url || numPagesVisited > maxPages ) {

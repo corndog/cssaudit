@@ -19,7 +19,20 @@ div.num {
 
 div.selector {
 	width: 92%;
-	height: 40px;
+	min-height: 30px;
+	max-height: 100px;
 	float: left;
 	overflow: scroll;
+}
+
+div.js-clickable {
+	cursor: pointer;
+}
+
+div.row {
+	margin-bottom: 5px;
+}
+
+div.odd div.selector {
+	background-color : #eee;
 }

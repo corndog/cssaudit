@@ -2,8 +2,7 @@
  * Load urls from command line params, either the url(s) themselves or a file
  * NOTE urls all need to start with http or phantom won't understand them
  */
-
-var fs = require('fs');  // let's load it on main page for now
+ 
 
 // plan is to support a number of options
 // 1) hand in one more urls on the command line
@@ -43,7 +42,6 @@ var getUrls = function() {
 			console.log("couldn't open file " + fname);
 		}
 	}
-	urls.forEach(function(url) {console.log(url);});
 	
 	return urls;
 };

@@ -1,9 +1,3 @@
-// relevant stuff is return {pages: pages, results: resultsForPage, currentPage: url, size: bodySize};
-var reportForPage = function(data) {
-
-	
-};
-
 /*  
  * { sheetName: {
  *		sheetSize: x, // length == number of bytes
@@ -21,6 +15,7 @@ var reportForPage = function(data) {
  *		}
  *	}
  */
+
 var reduce = function(summary, results) {
 	
 	var sheetName, dataForSheet, dataForSelectorGroups, dataForSelectorGroup, summaryForSelectorGroups, selectorGroup, 
@@ -57,60 +52,52 @@ var reduce = function(summary, results) {
 
 var printResults = function(dataFile) {
 	
-	var i, sheet, selector, result, num, used = 0, unused = 0, histogram = [], histOutput = [], longestUnusedSelector = "", mostUsedSelector, resultsForSelector, sel;
-	var fname = (filePrefix + "_unused_css.txt"), outFile = fs.open(fname , 'w'), stylesSize = 0;
+	var i, sheetName, dataForSheet, dataForSelectorGroup, dataForSelectorGroups, dataForSelectors, selectorGroup, selector, result;
+	var numMatches, used = 0, unused = 0, histogram = [], histOutput = [];
+	var longestUnusedSelectorGroup = "", mostUsedSelector, resultsForSelector, sel;
+	var outfile, stylesSize = 0;
 
-	console.log( "open file?? " + fname + "\nsummary??");
-	console.dir(summary);
-
-	for (sheet in summary) {
+	for (sheetName in summary) {
 		
-		//console.log( "outfile: " + outFile);
-		
-		outFile.writeLine("STYLESHEET: " + sheet);	
-		result = summary[sheet];
-		console.log("sheet: " + sheet + " size: " + result.pageSize);
-		stylesSize += result.pageSize;
+		dataForSheet = summary[sheetName];
+		stylesSize += dataForSheet.sheetSize;
+		dataForSelectorGroups = dataForSheet.dataForSelectorGroups;
 	    
-		for (selector in result) {
-			resultsForSelector = result[selector];
+		for (selectorGroup in dataForSelectorGroups) {
+			dataForSelectorGroup = dataForSelectorGroups[selectorGroup];
 
-			//console.log("\n\nSelector: " + selector + "\nTotal: " + resultsForSelector.count);
+			numMatches = dataForSelectorGroup.count;
+			if (numMatches === 0) {
 			
-			num = resultsForSelector.count;
-			if (num === 0) {
-				outFile.writeLine(selector + " : " + result[selector]);
 				unused += 1;
-				if ( selector.length > longestUnusedSelector.length) {
-					longestUnusedSelector = selector;
+				if ( selectorGroup.length > longestUnusedSelectorGroup.length) {
+					longestUnusedSelectorGroup = selectorGroup;
 				}
 			}
 			// lets just take a look at lightly used selectors
 			// figure this out: ONLY HAVE A pieceCounts of multipart selector
-			else if (num < 10 && selector.split(",").length > 1) {
+			else if (numMatches < 10 && selectorGroup.split(",").length > 1) {
 				used += 1;
 				console.log('\nlightly used:');
-				for (sel in resultsForSelector.pieceCounts) {
-					console.log(sel + " : " + resultsForSelector.pieceCounts[sel]);
+				for (sel in dataForSelectorGroup.dataForSelectors) {
+					console.log(sel + " : " + dataForSelectorGroup.dataForSelectors[sel]);
 				}
 			}
 			else {
 				used += 1;
 			}
 			
-			if (num > histogram.length) {
-				mostUsedSelector = selector;
+			if (numMatches > histogram.length) {
+				mostUsedSelector = selectorGroup;
 			}
 			
 			// construct histogram of usage of rules
-			if (! histogram[num]) {
-				histogram[num] = 0;
+			if (! histogram[numMatches]) {
+				histogram[numMatches] = 0;
 			}
-			histogram[num] += 1;
+			histogram[numMatches] += 1;
 		}
 	}
-	
-	
 	
 	
 	console.log("\n **HISTOGRAM");
@@ -125,11 +112,8 @@ var printResults = function(dataFile) {
 	console.log("\n\nUnused: " + unused);
 	console.log("Used  : " + used);
 	
-	console.log("\nLongest Unused Selector:\n" + longestUnusedSelector);
-	console.log(longestUnusedSelector.length + " is pretty damn long");
-	
-	outFile.flush();
-	outFile.close();
+	console.log("\nLongest Unused Selector:\n" + longestUnusedSelectorGroup);
+	console.log(longestUnusedSelectorGroup.length + " is pretty damn long");
 
 	// write the historgram data
 	outFile = fs.open('data/data.js', 'w');

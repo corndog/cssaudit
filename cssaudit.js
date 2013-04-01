@@ -14,21 +14,17 @@
  *
  * * Basic usage: phantomjs --web-security=false cssaudit.js urls.txt 
  */
-var println = console.log;
 var fs = require('fs');
 phantom.injectJs('stats.js');
 phantom.injectJs('auditor.js');
 phantom.injectJs('utils.js');
 
 
-var urls, crawl = false;
+var crawl = false, urls = UTILS.getUrls();
 // bookkeeping
 var allCounts = {}, stylesheetInfo = {}, alreadyInQueue = {}, dataRoot = "data.js"; // file to write the data to, as JSON/js
 // hacky stuff to limit it to a few pages at a time
 var numPagesVisited = 0, maxPages = 10;
-
-// processes command line to collect urls from command line or file
-urls = UTILS.getUrls();
 
 if (!urls || urls.length == 0) {
 	console.log("No urls, nothing to do");
@@ -36,7 +32,7 @@ if (!urls || urls.length == 0) {
 }
 else {
 	urls.forEach(function(url){
-		alreadyInQueue[url] = true; // so we don't add them again if we are crawling
+		alreadyInQueue[url] = true;
 	});
 }
 
@@ -56,7 +52,7 @@ var doOnLoad = function(status) {
 		phantom.exit();
 	}
 	else {
-		resp = page.evaluate(AUDITOR.auditor);
+		resp = page.evaluate(AUDITOR.audit);
 		numPagesVisited++;
 		STATS.reduce(allCounts, resp.pageUrl, resp.counts);
 

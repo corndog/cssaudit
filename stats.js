@@ -23,13 +23,18 @@ var STATS = {};
 	STATS.printResults = function(dataFile, allCounts) {
 		console.log("RESULTS \n" + allCounts);
 		
-		var k, selector, selectors, selectorLists, count, countsForSelector, page, sheetLink, numRules = 0;
+		var k, selector, selectors, selectorLists, count, countsForSelector, page, sheetLink, numRules = 0, numUnused = 0;
 
 		for (k in allCounts) {
-			console.log(k + "\n" + allCounts[k].total);
+			count = allCounts[k].total
+			console.log(k + "\n" + count);
 			numRules += 1;
+			if (count == 0) {
+				numUnused += 1;
+			}
 		}
-		console.log("how many rules ?? : " + numRules);
+		console.log("how many rules ???? : " + numRules);
+		console.log("how many not used ? : " + numUnused);
 
 		// for (sheetLink in stylesheetInfo) {
 		// 	println("sheet:\n" + sheetLink);

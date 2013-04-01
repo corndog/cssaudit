@@ -16,7 +16,7 @@
 
  var AUDITOR = {};
 
-AUDITOR.auditor = function() {
+AUDITOR.audit = function() {
 	
 	NodeList.prototype.forEach = Array.prototype.forEach;
 	var bodySize = document.getElementsByTagName('body')[0].getElementsByTagName('*').length;
@@ -131,13 +131,14 @@ AUDITOR.auditor = function() {
 			console.log("error in xhr request");
 		}
 	});
+  	
 	console.log('added selectors');
 
-	selectorCounts = getCounts();
+	//selectorCounts = getCounts();
 
-	console.log("finished " + url);
+	//console.log("finished " + url);
 
 	// counts = { div.booyah : 10, }
   	// send it back to parent process
-	return { pageLinks: pageLinks, counts: selectorCounts, pageUrl: url, size: bodySize, styleSheetInfo: stylesheetInfo}; 
+	return { pageLinks: pageLinks, counts: getCounts(), pageUrl: url, size: bodySize, styleSheetInfo: stylesheetInfo}; 
 };

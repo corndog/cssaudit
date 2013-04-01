@@ -16,9 +16,9 @@
  */
 var println = console.log;
 var fs = require('fs');
-phantom.injectJs('stats.js'); // reduce, printResults
-phantom.injectJs('auditor.js'); // auditor
-phantom.injectJs('utils.js'); // getUrls, login
+phantom.injectJs('stats.js');
+phantom.injectJs('auditor.js');
+phantom.injectJs('utils.js');
 
 
 var urls, crawl = false;
@@ -28,7 +28,7 @@ var allCounts = {}, stylesheetInfo = {}, alreadyInQueue = {}, dataRoot = "data.j
 var numPagesVisited = 0, maxPages = 10;
 
 // processes command line to collect urls from command line or file
-urls = getUrls();
+urls = UTILS.getUrls();
 
 if (!urls || urls.length == 0) {
 	console.log("No urls, nothing to do");
@@ -40,14 +40,12 @@ else {
 	});
 }
 
-// get phantom to create page
 var page = require('webpage').create();
 
 page.onConsoleMessage = function(msg) {
 	console.log(msg);
 };
- 
-// for pages we want to audit css
+
 var doOnLoad = function(status) {
 
 	var sheetLink, resp;
@@ -64,7 +62,7 @@ var doOnLoad = function(status) {
 
 		// collect the groups of selectors as they are in the css page, so we can display something that presents the rules in a visually similar way
 		for (sheetLink in resp.stylesheetInfo) {
-			if ( stylesheetInfo[sheetLink] !== 'undefined') {
+			if (typeof stylesheetInfo[sheetLink] !== 'undefined') {
 				stylesheetInfo[sheetLink] = resp.stylesheetInfo[sheetLink];
 			}
 		}
@@ -104,9 +102,9 @@ var process = function process() {
 				console.log("borked");
 			}
 			else {
-				// reset the onLoadFinished method, so we know what to do when we get  once we submit the login form
+				// reset the onLoadFinished method, so we know what to do once we submit the login form
 				page.onLoadFinished = doOnLoad;
-				resp = page.evaluate(login);
+				resp = page.evaluate(UTILS.login);
 			}
 		});
 	}

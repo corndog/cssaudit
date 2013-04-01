@@ -12,7 +12,7 @@
  * 
  * to allow cross-domain xhr --web-security=false
  *
- * * Basic usage: phantomjs --web-security=false cssaudit.js urls.txt 
+ * Basic usage: phantomjs --web-security=false cssaudit.js urls.txt 
  */
 var fs = require('fs');
 phantom.injectJs('stats.js');
@@ -76,15 +76,14 @@ var doOnLoad = function(status) {
 };
 
 
-var process = function process() {
+var process = function() {
   
-	var url = (urls.length > 0 ? urls.shift() : false), 
-		needsLogin = ( url &&  url.match(/signin/) );
+	var url = (urls.length > 0 ? urls.shift() : ""), needsLogin = ( url &&  url.match(/signin/) );
 
 	console.log("process next url: " + url);
 	
   	// done, analyse results and shut down phantom
-	if ( !url || numPagesVisited > maxPages ) {
+	if ( url === "" || numPagesVisited > maxPages ) {
 		STATS.printResults(dataRoot, allCounts);
 		phantom.exit();
 	}

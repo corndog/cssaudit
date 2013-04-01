@@ -1,38 +1,32 @@
-/* This is the function we pass into the loaded page.
+/* 
+ *
+ * This is the function we pass into the loaded page.
  * Everything needs to be self contained, no closure over variables in outer phantom process. It can only return data.
  * On each page we first find the stylesheet links, and links to other pages.
- * For each stylesheet, we load it via xhr, then find the selector groups and count their usage
- * then we break the big set of selectors into individual selectors and count those matches too
- * We also return the list of urls to other pages.
+ * 
+ * We really only care about the individual selector rules like div li.booyah 
+ * If I have div.x in more than one place on a stylesheet it still has the same number of matches on page regardless of where it is.
+ * So what we need to do is break down all the big aggregated selectors, and keep the unique selectors, then just count matches for each of them. Per page.
+ * Afterwards if we have a group of selectors:  div.booyah, li.oh-hai {} we can just look them up.
+ * For each page just pass back map of selector : count
+ * When aggregating have map of selector : { page1: count, page2 : count ....., total: count }
  *
- * Main data object we return:
- * { sheetName: {
- *		sheetSize: x, // length == number of bytes
- *		selectorGroups : [] // ordered, so they line up with the actual sheet
- *		dataForSelectorGroups: {
- *			// key for each one
- *			selectorGroup : {
- *				count: x, // matches
- *				selectors: [] // in order
- *				dataForSelectors { 
- *					// key for each one
- *					selector: n
- *				} 
- *			}
- *		}
- *	}
- *
+ * TODO the structure css for css animations breaks the regex. fix this, probably by learning about parser combinators...
  */
 
-var auditor = function() { 
+ var AUDITOR = {};
+
+AUDITOR.auditor = function() {
 	
 	NodeList.prototype.forEach = Array.prototype.forEach;
 	var bodySize = document.getElementsByTagName('body')[0].getElementsByTagName('*').length;
 	var url = window.location.href;
+	var selectorCounts, pageLinks, stylesheetLinks;
+  	var allSelectors = {}; // just collect all the selectors on all stylesheets used on this page
+  	var stylesheetInfo = {}; // keep each stylesheet url and an array of its grouped selectors, so we can display something visually reminiscent of the actual sheet.
 	console.log("\nprocessing css for " + url + "\n");
 
-
-	/* this takes the elements, either a ,or link 
+	/* this takes the elements, either a , or link 
  	* makes absolute urls out of relative ones,
  	* ignores links to other sites
  	* and # or javascript void ones . stolen from helium, then embellished
@@ -47,7 +41,7 @@ var auditor = function() {
 		
 			// occassionally an a has nothing under its href !?
 			if ( !tmplink || tmplink.match(/^#/) || tmplink.match(/javascript/)) {
-				return; // ignore this stuff
+				return; // ignore
 			}
 
 			// append full URI if absent
@@ -63,106 +57,87 @@ var auditor = function() {
 					tmplink = directory + tmplink;
 				}
 				tmplink = window.location.protocol + '//' + window.location.hostname + ":" + window.location.port + tmplink;
+				console.log("LINK IS :  " + tmplink);
 			}
 
-			//filter out pages not on this domain, can do cross domain xhr now for css
-			if(iscss || tmplink.indexOf( window.location.hostname ) !== -1 ){
+			//filter out web pages not on this domain since we don't want to go there
+			if(iscss || tmplink.indexOf( window.location.hostname ) !== -1 ) {
 				urls.push( tmplink );
 		    }
 		});
 		return urls;
 	};
 
-
-	var findPages = function() {
+	var findPageLinks = function() {
 		var pageLinks = document.querySelectorAll('a');
 		return constructOwnUrls(pageLinks);
 	};
 
-	var findCssLinks = function() {
+	var findStylesheetLinks = function() {
 		var linkEls = document.querySelectorAll('link[rel=stylesheet]');
 		return constructOwnUrls(linkEls, true); 
   	};
 
-	// stolen from helium-css
-  	var findSelectors = function(sheet) {
+  	// add them to the store of selectors used on page
+  	var addSelectors = function(link, sheet) {
     	//remove css comments
 		var data = sheet.replace(/\/\*[\s\S]*?\*\//gim,"");
+		// argh nested weirdness for keyframes defeats this regexp
+		var selectorLists = data.replace(/\n/g,'').match(/[^\}]+[\.\#\-\w]?(?=\{)/gim);
 
-		//parse selectors. ##NEWLINE REMOVAL IS HACKISH, CAN BE DONE BETTER WITH A BETTER REGEX
-		var selectors = data.replace(/\n/g,'').match(/[^\}]+[\.\#\-\w]?(?=\{)/gim);
-	
-		return selectors;
-  	};
-  
-  	// returns list of selectorGroups and data: {}
-  	var analyzeStylesheet = function(stylesheet) {
-   
-		var selectorGroups = findSelectors(stylesheet);
-		var results = {
-			sheetSize: stylesheet.length,
-			selectorGroups: selectorGroups,
-			dataForSelectorGroups: {}
-		}; 
-
-		selectorGroups.forEach(function(selectorGroup) {
-			// count, list of selectors, data: { selector: count}
-			var data = {
-				dataForSelectors: {} // individual selectors and counts
-			};
-			var selectors, numMatches = null;
-			
-			if (selectorGroup.match(/@font-face/) || selectorGroup.match(/@charset/)) {
-				return; // ignore font-face, its not relevant
-			}
+		//console.log(selectorLists);
 		
+		stylesheetInfo[link] = selectorLists;
+
+		selectorLists.forEach(function(list){
+			//console.log("list: " + list);
+			list.split(',').forEach(function(selector) {
+				//console.log('selector + ' + selector);
+				allSelectors[selector.trim()] = 1;
+			});
+		});
+  	};
+
+	var getCounts = function() {
+		var selector, counts = {};
+
+		for (selector in allSelectors) {
 			try {
-				numMatches = document.querySelectorAll(selectorGroup).length;
+				counts[selector] = document.querySelectorAll(selector).length;
 			}
 			catch(e) {
-				console.log("bad selector: " + selectorGroup + "\n" + e);
+				console.log("bad selector: " + selector + "\n" + e);
 			}
-			if (numMatches !== null) {
-				data.count = numMatches;
-				selectors = selectorGroup.split(',');
-				data.selectors = selectors;
-				
-				// analyse each piece if the whole thing is not too heavily used
-				if (selectors.length > 1) {
-					selectors.forEach(function(selector){
-						data.dataForSelectors[selector] = document.querySelectorAll(selector).length;
-					});
-				}
-				
-				results.dataForSelectorGroups[selectorGroup] = data;
-			}
-		});
-		return results;
+		}
+		return counts;
 	};
 
-  	// actual logic
-  	var pages = findPages();
-  	var links = findCssLinks();
-  	console.log("FOUND: " + links.length + " stylesheets");
+  	pageLinks = findPageLinks();
+  	stylesheetLinks = findStylesheetLinks();
+  	console.log("FOUND: " + stylesheetLinks.length + " stylesheets");
 
-  	var resultsForPage = {};
-  	// for each css file, load it, count use of each selector
-  	links.forEach(function(sheetName) {
-		console.log("getting sheet " + sheetName);
+
+  	// for each css file, load it, collect selectors
+  	stylesheetLinks.forEach(function(sheetLink) {
+		console.log("getting sheet " + sheetLink);
 		var request = new XMLHttpRequest();  
-		request.open('GET', sheetName, false);  // synchronous
+		request.open('GET', sheetLink, false);  // synchronous
 		request.send(null);  
 
-		if (request.status === 200) {  
-			resultsForPage[sheetName] = analyzeStylesheet(request.responseText);
+		if (request.status === 200 && request.responseText) {  
+			addSelectors(sheetLink, request.responseText);
 		}
 		else {
 			console.log("error in xhr request");
 		}
 	});
+	console.log('added selectors');
+
+	selectorCounts = getCounts();
 
 	console.log("finished " + url);
 
+	// counts = { div.booyah : 10, }
   	// send it back to parent process
-	return {pages: pages, results: resultsForPage, currentPage: url, size: bodySize};
+	return { pageLinks: pageLinks, counts: selectorCounts, pageUrl: url, size: bodySize, styleSheetInfo: stylesheetInfo}; 
 };

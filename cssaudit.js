@@ -10,9 +10,11 @@
  * Idea is to collect the data in a big js object, then write it to a file as JSON.
  * Then we can a webpage/pages that read this data, providing a view interface.
  * 
- * to allow cross-domain xhr --web-security=no
+ * to allow cross-domain xhr --web-security=false
  *
+ * * Basic usage: phantomjs --web-security=false cssaudit.js urls.txt 
  */
+var println = console.log;
 var fs = require('fs');
 phantom.injectJs('stats.js'); // reduce, printResults
 phantom.injectJs('auditor.js'); // auditor
@@ -21,7 +23,7 @@ phantom.injectJs('utils.js'); // getUrls, login
 
 var urls, crawl = false;
 // bookkeeping
-var summary = {}, alreadyInQueue = {}, dataRoot = "data.js"; // file to write the data to, as JSON/js
+var allCounts = {}, stylesheetInfo = {}, alreadyInQueue = {}, dataRoot = "data.js"; // file to write the data to, as JSON/js
 // hacky stuff to limit it to a few pages at a time
 var numPagesVisited = 0, maxPages = 10;
 
@@ -44,11 +46,11 @@ var page = require('webpage').create();
 page.onConsoleMessage = function(msg) {
 	console.log(msg);
 };
-
+ 
 // for pages we want to audit css
 var doOnLoad = function(status) {
 
-	var resp;
+	var sheetLink, resp;
 	console.log("page loaded");
 	
 	if (status !== 'success') {
@@ -56,19 +58,26 @@ var doOnLoad = function(status) {
 		phantom.exit();
 	}
 	else {
-		resp = page.evaluate(auditor);
+		resp = page.evaluate(AUDITOR.auditor);
 		numPagesVisited++;
-		reduce(summary, resp.results);
+		STATS.reduce(allCounts, resp.pageUrl, resp.counts);
+
+		// collect the groups of selectors as they are in the css page, so we can display something that presents the rules in a visually similar way
+		for (sheetLink in resp.stylesheetInfo) {
+			if ( stylesheetInfo[sheetLink] !== 'undefined') {
+				stylesheetInfo[sheetLink] = resp.stylesheetInfo[sheetLink];
+			}
+		}
 		
 		if (crawl) {
-			resp.pages.forEach(function(page) {
+			resp.pageLinks.forEach(function(page) {
 				if (!alreadyInQueue[page] ) {
 					urls.push(page);
 					alreadyInQueue[page] = true;
 				}
 			});
 		}
-	  	process(); // do it all again, recursion keeps it sequential
+	  	process();
     }
 };
 
@@ -82,7 +91,7 @@ var process = function process() {
 	
   	// done, analyse results and shut down phantom
 	if ( !url || numPagesVisited > maxPages ) {
-		printResults(dataRoot);
+		STATS.printResults(dataRoot, allCounts);
 		phantom.exit();
 	}
   	// if we need to login its a bit more complicated

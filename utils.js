@@ -35,7 +35,7 @@ var getUrls = function() {
 		if (urlsFile) {
 			urlsFile.split("\n").forEach(function(url){
 				console.log("found " + url);
-				urls.push(url);
+				if (url.indexOf('http') === 0) urls.push(url);
 			});
 		}
 		else {

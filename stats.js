@@ -19,15 +19,14 @@ var STATS = {};
 	};
 
 
-	// var allCounts = {}, styleSheetInfo = {}
-	STATS.printResults = function(dataFile, allCounts) {
-		console.log("RESULTS \n" + allCounts);
+	// var allCounts = {}, stylesheetInfo = {}
+	STATS.printResults = function(dataFile, allCounts, stylesheetInfo, size) {
 		
-		var k, selector, selectors, selectorLists, count, countsForSelector, page, sheetLink, numRules = 0, numUnused = 0;
+		var k, count, numRules = 0, numUnused = 0;
 
 		for (k in allCounts) {
 			count = allCounts[k].total
-			console.log(k + "\n" + count);
+			//console.log(k + "\n" + count);
 			numRules += 1;
 			if (count == 0) {
 				numUnused += 1;
@@ -35,20 +34,17 @@ var STATS = {};
 		}
 		console.log("how many rules ???? : " + numRules);
 		console.log("how many not used ? : " + numUnused);
+		console.log("total size of css ? : " + size);
 
-		// for (sheetLink in stylesheetInfo) {
-		// 	println("sheet:\n" + sheetLink);
-
-		// 	selectorLists = styleSheetInfo[sheetLink];
-
-		// 	selectorLists.forEach(function(sl){
-		// 		selectors = sl.split(',');
-		// 		selectors.forEach(function(s){
-		// 			count = allCounts[s.trim].total;
-		// 			println(selectors + '\n' + count + '\n');
-		// 		});
-		// 	});
-		// }
+		// write it out to data.js
+		// write the historgram data
+	outFile = fs.open('data/data.js', 'w');
+	outFile.writeLine('var data = ' + JSON.stringify(allCounts) + ';');
+	//outFile.writeLine('var stylesSize = ' + (parseInt(stylesSize/1000)) + ';');
+	outFile.writeLine('var stylesheetInfo = ' + JSON.stringify(stylesheetInfo) + ';');
+	outFile.writeLine('var size = ' + size + ';')
+	outFile.flush();
+	outFile.close();
 	};
 
 }());

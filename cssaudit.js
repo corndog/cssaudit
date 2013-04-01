@@ -24,7 +24,7 @@ var crawl = false, urls = UTILS.getUrls();
 // bookkeeping
 var allCounts = {}, stylesheetInfo = {}, alreadyInQueue = {}, dataRoot = "data.js"; // file to write the data to, as JSON/js
 // hacky stuff to limit it to a few pages at a time
-var numPagesVisited = 0, maxPages = 10;
+var numPagesVisited = 0, maxPages = 10, size = 0;
 
 if (!urls || urls.length == 0) {
 	console.log("No urls, nothing to do");
@@ -55,6 +55,7 @@ var doOnLoad = function(status) {
 		resp = page.evaluate(AUDITOR.audit);
 		numPagesVisited++;
 		STATS.reduce(allCounts, resp.pageUrl, resp.counts);
+		size += resp.size;
 
 		// collect the groups of selectors as they are in the css page, so we can display something that presents the rules in a visually similar way
 		for (sheetLink in resp.stylesheetInfo) {
@@ -78,13 +79,13 @@ var doOnLoad = function(status) {
 
 var process = function() {
   
-	var url = (urls.length > 0 ? urls.shift() : ""), needsLogin = ( url &&  url.match(/signin/) );
+	var url = (urls.length > 0 ? urls.shift() : ""), needsLogin = url.match(/signin/);
 
 	console.log("process next url: " + url);
 	
   	// done, analyse results and shut down phantom
 	if ( url === "" || numPagesVisited > maxPages ) {
-		STATS.printResults(dataRoot, allCounts);
+		STATS.printResults(dataRoot, allCounts, stylesheetInfo, size);
 		phantom.exit();
 	}
   	// if we need to login its a bit more complicated

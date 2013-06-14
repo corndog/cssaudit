@@ -14,17 +14,37 @@
  * TODO the structure css for css animations breaks the regex. fix this, probably by learning about parser combinators...
  */
 
- var AUDITOR = {};
+var AUDITOR = {};
 
 AUDITOR.audit = function() {
+
+	console.log("Strarting auditor on page " + window.location.href);
+
+	var pageLinks, stylesheetLinks, newLinks, uniqueSelectors, newSheets = {};
+
+	var postToServer = function(path, data, respHandler) {
+		//console.log("POSTING TO " + path + " : " + JSON.stringify(data));
+		var xhr = new XMLHttpRequest();
+		var url = "http://127.0.0.1:8080/" + path;
+		xhr.open('POST', url, false); // sync
+		var crap = JSON.stringify({"cat": 9})// JSON.stringify(data);
+		//xhr.setRequestHeader('Content-type', 'application/json');
+		xhr.send(crap);
+
+		if (xhr.status === 200 && xhr.responseText) {  
+			//addSelectors(sheetLink, request.responseText);
+			console.log("FINALLY " + xhr.responseText);
+			//respHandler(xhr.responseText);
+		}
+		else {
+			console.log("error in xhr request");
+		}
+	};
 	
 	NodeList.prototype.forEach = Array.prototype.forEach;
 	var bodySize = document.getElementsByTagName('body')[0].getElementsByTagName('*').length;
 	var url = window.location.href;
-	var selectorCounts, pageLinks, stylesheetLinks;
-  	var allSelectors = {}; // just collect all the selectors on all stylesheets used on this page
-  	var stylesheetInfo = {}; // keep each stylesheet url and an array of its grouped selectors, so we can display something visually reminiscent of the actual sheet.
-	console.log("\nprocessing css for " + url + "\n");
+	//var selectorCounts, pageLinks, stylesheetLinks;
 
 	/* this takes the elements, either a , or link 
  	* makes absolute urls out of relative ones,
@@ -57,7 +77,7 @@ AUDITOR.audit = function() {
 					tmplink = directory + tmplink;
 				}
 				tmplink = window.location.protocol + '//' + window.location.hostname + ":" + window.location.port + tmplink;
-				console.log("LINK IS :  " + tmplink);
+				//console.log("LINK IS :  " + tmplink);
 			}
 
 			//filter out web pages not on this domain since we don't want to go there
@@ -78,30 +98,10 @@ AUDITOR.audit = function() {
 		return constructOwnUrls(linkEls, true); 
   	};
 
-  	// add them to the store of selectors used on page
-  	var addSelectors = function(link, sheet) {
-    	//remove css comments
-		var data = sheet.replace(/\/\*[\s\S]*?\*\//gim,"");
-		// argh nested weirdness for keyframes defeats this regexp
-		var selectorLists = data.replace(/\n/g,'').match(/[^\}]+[\.\#\-\w]?(?=\{)/gim);
-
-		//console.log(selectorLists);
-		
-		stylesheetInfo[link] = selectorLists;
-
-		selectorLists.forEach(function(list){
-			//console.log("list: " + list);
-			list.split(',').forEach(function(selector) {
-				//console.log('selector + ' + selector);
-				allSelectors[selector.trim()] = 1;
-			});
-		});
-  	};
-
-	var getCounts = function() {
+	var getCounts = function(selectors) {
 		var selector, counts = {};
 
-		for (selector in allSelectors) {
+		for (selector in selectors) {
 			try {
 				counts[selector] = document.querySelectorAll(selector).length;
 			}
@@ -112,33 +112,49 @@ AUDITOR.audit = function() {
 		return counts;
 	};
 
-  	pageLinks = findPageLinks();
-  	stylesheetLinks = findStylesheetLinks();
-  	console.log("FOUND: " + stylesheetLinks.length + " stylesheets");
+	var postLinks = function(links) { 
+  	postToServer('links', links, function(resp) {
+  		var resp = JSON.parse(resp);
+  		if (resp.notProcessedYet) {
+  			newLinks = resp.notProcessedYet;
+  		}
+  		else if (resp.uniqueSelectors) {
+  			uniqueSelectors = resp.uniqueSelectors;
+  		}
+  	});
+  };
 
+  pageLinks = findPageLinks();
+  stylesheetLinks = findStylesheetLinks();
+  console.log("FOUND: " + stylesheetLinks.length + " stylesheets");
 
-  	// for each css file, load it, collect selectors
-  	stylesheetLinks.forEach(function(sheetLink) {
-		console.log("getting sheet " + sheetLink);
+  // all xhr requests block
+  // first just post the list of stylesheetLinks to server, see which ones we don't already know about
+  postLinks(stylesheetLinks);
+
+  // if we don't know about some of the stylesheets, go get them
+  newLinks.forEach(function(link) {
+		console.log("getting contents for " + link);
 		var request = new XMLHttpRequest();  
-		request.open('GET', sheetLink, false);  // synchronous
+		request.open('GET', link, false);  // synchronous
 		request.send(null);  
 
 		if (request.status === 200 && request.responseText) {  
-			addSelectors(sheetLink, request.responseText);
+			newSheets[link] = request.responseText;
 		}
 		else {
 			console.log("error in xhr request");
 		}
 	});
-  	
-	console.log('added selectors');
 
-	//selectorCounts = getCounts();
-
-	//console.log("finished " + url);
+  // found some new ones, let the server know, just expect an OK when its done
+	if (newLinks.length > 0) {
+		postToServer('sheets', { sheets: newSheets, links: stylesheetLinks }, function(resp){
+			uniqueSelectors = resp.uniqueSelectors; // now we should definitely get back just the unique selectors
+		});
+	}
 
 	// counts = { div.booyah : 10, }
   	// send it back to parent process
-	return { pageLinks: pageLinks, counts: getCounts(), pageUrl: url, size: bodySize, styleSheetInfo: stylesheetInfo}; 
+	return { pageLinks: pageLinks, counts: getCounts( uniqueSelectors )}; 
 };

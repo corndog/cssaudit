@@ -19,7 +19,6 @@ phantom.injectJs('stats.js');
 phantom.injectJs('auditor.js');
 phantom.injectJs('utils.js');
 
-
 var crawl = false, urls = UTILS.getUrls();
 // bookkeeping
 var allCounts = {}, stylesheetInfo = {}, alreadyInQueue = {}, dataRoot = "data.js"; // file to write the data to, as JSON/js

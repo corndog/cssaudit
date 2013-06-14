@@ -2,4 +2,11 @@ This is a program that crawls your/a website and reports on the usage or lack th
 The approach, and some code is taken from the helium-css project, except that instead of adding the necessary javascript to your app this uses phantom.js to load the page(s) and then runs the css analysis.
 This is very much work in progress.
 
+If we are going to crawl a site, probably the same stylesheets are on most pages.
+No need fetch them everytime
+
+So: maybe need two passes through phantom
+First, starting with a url, load that page, find the links to the css files, and other pages.
+
+
 

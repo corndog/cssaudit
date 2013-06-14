@@ -59,7 +59,7 @@ var doOnLoad = function(status) {
 
 		// collect the groups of selectors as they are in the css page, so we can display something that presents the rules in a visually similar way
 		for (sheetLink in resp.stylesheetInfo) {
-			if (typeof stylesheetInfo[sheetLink] !== 'undefined') {
+			if (typeof resp.stylesheetInfo[sheetLink] !== 'undefined') {
 				stylesheetInfo[sheetLink] = resp.stylesheetInfo[sheetLink];
 			}
 		}

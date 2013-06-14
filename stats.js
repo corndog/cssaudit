@@ -38,13 +38,13 @@ var STATS = {};
 
 		// write it out to data.js
 		// write the historgram data
-	outFile = fs.open('data/data.js', 'w');
-	outFile.writeLine('var data = ' + JSON.stringify(allCounts) + ';');
-	//outFile.writeLine('var stylesSize = ' + (parseInt(stylesSize/1000)) + ';');
-	outFile.writeLine('var stylesheetInfo = ' + JSON.stringify(stylesheetInfo) + ';');
-	outFile.writeLine('var size = ' + size + ';')
-	outFile.flush();
-	outFile.close();
+		outFile = fs.open('data/data.js', 'w');
+		outFile.writeLine('var data = ' + JSON.stringify(allCounts) + ';');
+		//outFile.writeLine('var stylesSize = ' + (parseInt(stylesSize/1000)) + ';');
+		outFile.writeLine('var stylesheetInfo = ' + JSON.stringify(stylesheetInfo) + ';');
+		outFile.writeLine('var size = ' + size + ';')
+		outFile.flush();
+		outFile.close();
 	};
 
 }());

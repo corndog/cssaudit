@@ -1,5 +1,14 @@
 This is a program that crawls your/a website and reports on the usage or lack thereof of the css rules in your stylesheets.
 The approach, and some code is taken from the helium-css project, except that instead of adding the necessary javascript to your app this uses phantom.js to load the page(s) and then runs the css analysis.
+
+run it via instructions in the main program, cssaudit.js
+
+if phantom doesn't crash, which it often does (worth trying a few times if its just a random crash), 
+it will dump its data in data/data.js
+then open up a browser and open pages/stylesheets.html
+that will show you a link of the css sheets it found. Click one and you'll see all the
+groups of selectors, red ones are not used, orange used once, green twice up to violet used 6 times :)
+
 This is very much work in progress.
 
 

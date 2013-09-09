@@ -25,64 +25,64 @@ var allCounts = {}, stylesheetInfo = {}, alreadyInQueue = {}, dataRoot = "data.j
 var numPagesVisited = 0, maxPages = 10, size = 0;
 
 if (!urls || urls.length == 0) {
-	console.log("No urls, nothing to do");
-	phantom.exit();
+  console.log("No urls, nothing to do");
+  phantom.exit();
 }
 else {
-	urls.forEach(function(url){
-		alreadyInQueue[url] = true;
+  urls.forEach(function(url) {
+    alreadyInQueue[url] = true;
 	});
 }
 
 var page = require('webpage').create();
 
 page.onConsoleMessage = function(msg) {
-	console.log(msg);
+  console.log(msg);
 };
 
 var doOnLoad = function(status) {
 
-	var sheetLink, resp;
-	console.log("page loaded");
+  var sheetLink, resp;
+  console.log("page loaded");
 	
-	if (status !== 'success') {
-		console.log("something went wrong with this page " + status);
-		phantom.exit();
+  if (status !== 'success') {
+    console.log("something went wrong with this page " + status);
+    phantom.exit();
 	}
 	else {
-		resp = page.evaluate(AUDITOR.audit);
-		numPagesVisited++;
-		STATS.reduce(allCounts, resp.pageUrl, resp.counts);
-		size += resp.size;
+    resp = page.evaluate(AUDITOR.audit);
+    numPagesVisited++;
+    STATS.reduce(allCounts, resp.pageUrl, resp.counts);
+    size += resp.size;
 
-		// collect the groups of selectors as they are in the css page, so we can display something that presents the rules in a visually similar way
-		for (sheetLink in resp.stylesheetInfo) {
-			if (typeof resp.stylesheetInfo[sheetLink] !== 'undefined') {
-				stylesheetInfo[sheetLink] = resp.stylesheetInfo[sheetLink];
-			}
-		}
-		
-		if (crawl) {
-			resp.pageLinks.forEach(function(page) {
-				if (!alreadyInQueue[page] ) {
-					urls.push(page);
-					alreadyInQueue[page] = true;
-				}
-			});
-		}
-	  	process();
+    // collect the groups of selectors as they are in the css page, so we can display something that presents the rules in a visually similar way
+    for (sheetLink in resp.stylesheetInfo) {
+      if (typeof resp.stylesheetInfo[sheetLink] !== 'undefined') {
+        stylesheetInfo[sheetLink] = resp.stylesheetInfo[sheetLink];
+      }
     }
+		
+    if (crawl) {
+      resp.pageLinks.forEach(function(page) {
+        if (!alreadyInQueue[page] ) {
+          urls.push(page);
+          alreadyInQueue[page] = true;
+        }
+      });
+    }
+    process();
+  }
 };
 
 
 var process = function() {
   
-	var url = (urls.length > 0 ? urls.shift() : ""), needsLogin = url.match(/signin/);
+  var url = (urls.length > 0 ? urls.shift() : ""), needsLogin = url.match(/signin/);
 
-	console.log("process next url: " + url);
+  console.log("process next url: " + url);
 	
-  	// done, analyse results and shut down phantom
-	if ( url === "" || numPagesVisited > maxPages ) {
+  // done, analyse results and shut down phantom
+  if ( url === "" || numPagesVisited > maxPages ) {
 		STATS.printResults(dataRoot, allCounts, stylesheetInfo, size);
 		phantom.exit();
 	}

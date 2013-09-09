@@ -31,7 +31,7 @@ if (!urls || urls.length == 0) {
 else {
   urls.forEach(function(url) {
     alreadyInQueue[url] = true;
-	});
+  });
 }
 
 var page = require('webpage').create();
@@ -49,7 +49,7 @@ var doOnLoad = function(status) {
     console.log("something went wrong with this page " + status);
     phantom.exit();
 	}
-	else {
+  else {
     resp = page.evaluate(AUDITOR.audit);
     numPagesVisited++;
     STATS.reduce(allCounts, resp.pageUrl, resp.counts);
@@ -83,12 +83,11 @@ var process = function() {
 	
   // done, analyse results and shut down phantom
   if ( url === "" || numPagesVisited > maxPages ) {
-		STATS.printResults(dataRoot, allCounts, stylesheetInfo, size);
+    STATS.printResults(dataRoot, allCounts, stylesheetInfo, size);
 		phantom.exit();
 	}
   	// if we need to login its a bit more complicated
 	else if (needsLogin) {
-	
 		// open the login url
 		page.open(url, function(status) {
 			var resp;
@@ -96,15 +95,15 @@ var process = function() {
 				console.log("borked");
 			}
 			else {
-				// reset the onLoadFinished method, so we know what to do once we submit the login form
+			// reset the onLoadFinished method, so we know what to do once we submit the login form
 				page.onLoadFinished = doOnLoad;
 				resp = page.evaluate(UTILS.login);
 			}
 		});
 	}
 	else { 
-    	page.open(url, doOnLoad);
-  	}
+		page.open(url, doOnLoad);
+	}
 };
 
 process(); // finally kick off the whole production

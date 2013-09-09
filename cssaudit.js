@@ -84,26 +84,26 @@ var process = function() {
   // done, analyse results and shut down phantom
   if ( url === "" || numPagesVisited > maxPages ) {
     STATS.printResults(dataRoot, allCounts, stylesheetInfo, size);
-		phantom.exit();
-	}
-  	// if we need to login its a bit more complicated
-	else if (needsLogin) {
-		// open the login url
-		page.open(url, function(status) {
-			var resp;
-			if (status !== 'success') {
-				console.log("borked");
-			}
-			else {
-			// reset the onLoadFinished method, so we know what to do once we submit the login form
-				page.onLoadFinished = doOnLoad;
-				resp = page.evaluate(UTILS.login);
-			}
-		});
-	}
-	else { 
-		page.open(url, doOnLoad);
-	}
+    phantom.exit();
+  }
+  // if we need to login its a bit more complicated
+  else if (needsLogin) {
+    // open the login url
+    page.open(url, function(status) {
+      var resp;
+      if (status !== 'success') {
+        console.log("borked");
+      }
+      else {
+        // reset the onLoadFinished method, so we know what to do once we submit the login form
+        page.onLoadFinished = doOnLoad;
+        resp = page.evaluate(UTILS.login);
+      }
+    });
+  }
+  else { 
+    page.open(url, doOnLoad);
+  }
 };
 
 process(); // finally kick off the whole production

@@ -1,7 +1,6 @@
 var STATS = {};
 
 (function(){
-	
 	/*  
  	* For each page just pass back map of selector : count
  	* When aggregating have map of selector : { page1: count, page2 : count ....., total: count }
@@ -18,7 +17,6 @@ var STATS = {};
 		}
 	};
 
-
 	// var allCounts = {}, stylesheetInfo = {}
 	STATS.printResults = function(dataFile, allCounts, stylesheetInfo, size) {
 		
@@ -26,7 +24,6 @@ var STATS = {};
 
 		for (k in allCounts) {
 			count = allCounts[k].total
-			//console.log(k + "\n" + count);
 			numRules += 1;
 			if (count == 0) {
 				numUnused += 1;

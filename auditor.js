@@ -489,8 +489,7 @@ CSSParser.parse = function(css, options){
   return stylesheet();
 };
 
-// *********** INTERESTING CODE GOES HERE *************************
-	
+// *********** INTERESTING CODE GOES HERE ************************ 
 	NodeList.prototype.forEach = Array.prototype.forEach;
 	var bodySize = document.getElementsByTagName('body')[0].getElementsByTagName('*').length;
 	var url = window.location.href;

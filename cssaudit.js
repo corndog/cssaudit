@@ -1,5 +1,3 @@
-"use strict"; 
-
 /* Analyse/crawl your website and see how much css gets used.
  *
  * problems: it occassionally dies on fxbml tags not rendering, can I catch an exception somewhere?
